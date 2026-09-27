@@ -137,5 +137,30 @@ export interface SalesRepositoryPort {
   ): Promise<{ items: import("../domain/sales.types").PaymentEntity[]; total: number }>;
   createBankTransactionProof(data: import("../domain/sales.types").CreateBankTransactionProofInput): Promise<import("../domain/sales.types").BankTransactionProofEntity>;
   getBankTransactionProof(id: string): Promise<import("../domain/sales.types").BankTransactionProofEntity | null>;
+
+  // Sales Returns & Inventory Restorations
+  createSalesReturn(
+    data: import("../domain/sales.types").CreateSalesReturnInput,
+    userId?: string
+  ): Promise<import("../domain/sales.types").SalesReturnEntity>;
+  getSalesReturnById(id: string): Promise<import("../domain/sales.types").SalesReturnEntity | null>;
+  listSalesReturns(
+    filter?: { invoiceId?: string; customerId?: string; branchId?: string },
+    pagination?: Pagination
+  ): Promise<{ items: import("../domain/sales.types").SalesReturnEntity[]; total: number }>;
+  getInvoiceReturnableItems(invoiceId: string): Promise<{
+    invoice: InvoiceEntity;
+    items: {
+      productId: string;
+      productName: string;
+      sku: string;
+      trackingType: "SERIALIZED" | "NON_SERIALIZED";
+      invoicedQuantity: number;
+      alreadyReturnedQuantity: number;
+      returnableQuantity: number;
+      unitPrice: number;
+      soldSerials: string[];
+    }[];
+  }>;
 }
 
