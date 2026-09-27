@@ -573,3 +573,65 @@ export interface CreateBankTransactionProofInput {
   uploadedById?: string;
 }
 
+export interface SalesReturnLineEntity {
+  id: string;
+  salesReturnId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  serials: string[];
+  product?: {
+    id: string;
+    sku: string;
+    name: string;
+    trackingType: "SERIALIZED" | "NON_SERIALIZED";
+    modelNumber?: string | null;
+  };
+}
+
+export interface SalesReturnEntity {
+  id: string;
+  returnNumber: string;
+  invoiceId: string;
+  customerId: string;
+  branchId: string;
+  warehouseId: string;
+  totalAmount: number;
+  creditToWallet: boolean;
+  refundAmount: number;
+  reason?: string | null;
+  status: string;
+  createdAt: Date;
+  invoice?: {
+    id: string;
+    invoiceNumber: string;
+    grandTotal: number;
+  };
+  customer?: {
+    id: string;
+    customerCode: string;
+    displayName: string;
+  };
+  warehouse?: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  lines: SalesReturnLineEntity[];
+}
+
+export interface CreateSalesReturnInput {
+  invoiceId: string;
+  warehouseId: string;
+  reason?: string;
+  creditToWallet?: boolean;
+  lines: {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    serials?: string[];
+  }[];
+}
+
+
