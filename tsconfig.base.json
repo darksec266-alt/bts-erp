@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@bts/db": ["packages/db/src"],
+      "@bts/shared-types": ["packages/shared-types/src"],
+      "@bts/ui": ["packages/ui/src"],
+      "@bts/export-engine": ["packages/export-engine/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next"]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@bts/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prisma schema, migrations, and seed for the BTS ERP platform. Models land in Phase 1 (database-schema.md).",
+  "main": "src/index.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "studio": "prisma studio",
+    "seed": "ts-node prisma/seed.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.4",
+    "@types/jest": "^29.5.12"
+  }
+}

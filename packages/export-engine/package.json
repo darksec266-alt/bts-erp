@@ -1,0 +1,10 @@
+{
+  "name": "@bts/export-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CSV/PDF/DOCX/XML renderers plus the Universal Print & Letterhead Toggle Engine, shared by every module (architecture.md §5, Accounting_and_Finance_Full_Specification.md §49 & §66). Built in Phase 18 (Import/Export/Print, prompt.md §202) but scaffolded early since §66.1 requires one shared ExportMenu implementation, never rebuilt per module.",
+  "main": "src/index.ts",
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

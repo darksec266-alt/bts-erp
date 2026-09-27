@@ -1,0 +1,32 @@
+{
+  "name": "bts-erp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Brother's Technology System — Unified Business Management Platform (75-module ERP). See /docs for the full specification set.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web & npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run generate --workspace=packages/db",
+    "db:migrate": "npm run migrate:dev --workspace=packages/db",
+    "db:seed": "npm run seed --workspace=packages/db"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "prettier": "^3.3.3"
+  }
+}

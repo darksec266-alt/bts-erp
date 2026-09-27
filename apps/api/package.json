@@ -1,0 +1,43 @@
+{
+  "name": "@bts/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Express Modular Monolith API (architecture.md §2, §5). Phase 0: scaffold + /health only, no business logic.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@bts/config": "*",
+    "@bts/db": "*",
+    "@bts/shared-types": "*",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "otplib": "^13.0.1",
+    "pino": "^9.3.2",
+    "pino-http": "^10.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.5",
+    "@babel/preset-env": "^8.0.5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.15",
+    "@types/supertest": "^6.0.2",
+    "babel-jest": "^30.5.1",
+    "jest": "^29.7.0",
+    "pino-pretty": "^11.2.2",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.4"
+  }
+}

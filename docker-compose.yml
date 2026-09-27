@@ -1,0 +1,111 @@
+# Local development compose file. Topology matches architecture.md §38
+# (Nginx edge -> web:3000 / api:4000, Postgres + Redis internal-only in
+# production) but relaxes two things for dev convenience only:
+#   1. Postgres/Redis ports are published to the host (so Prisma Studio,
+#      pgAdmin, or `redis-cli` on your machine can connect directly) —
+#      docker-compose.prod.yml removes this, matching
+#      production_postgresql_pgadmin_prisma_secure_setup.md §7's explicit
+#      "no ports: 5432:5432" rule.
+#   2. web/api also `expose` their ports through Nginx AND publish them
+#      directly, so you can hit :3000/:4000 while iterating without going
+#      through the proxy.
+#
+# Phase 0 has no Dockerfiles with real app code to build yet in the sense of
+# business logic, but the scaffold app (health check, placeholder page) is
+# real and this file is meant to be run now, per HANDOFF.md's exact next
+# step: "docker compose up ... confirm the base stack starts clean."
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bts_erp_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-bts_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bts_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - private-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bts_app} -d ${POSTGRES_DB:-bts_erp_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - private-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: ./infra/docker/api.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bts_app}:${POSTGRES_PASSWORD:-bts_dev_password}@postgres:5432/${POSTGRES_DB:-bts_erp_dev}
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - public-network
+      - private-network
+
+  web:
+    build:
+      context: .
+      dockerfile: ./infra/docker/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      API_INTERNAL_URL: http://api:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - public-network
+
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+      - api
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infra/nginx/snippets:/etc/nginx/snippets:ro
+    networks:
+      - public-network
+
+networks:
+  public-network:
+  private-network:
+
+volumes:
+  postgres_data:
+  redis_data:

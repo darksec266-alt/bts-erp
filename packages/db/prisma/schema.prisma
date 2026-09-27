@@ -1,0 +1,1968 @@
+// Brother's Technology System — Unified Business Management Platform
+// Prisma schema — Phase 1 (Database Foundation, prompt.md §185)
+//
+// Source of truth: database.md §3 (Identity/Master-Data-pattern/Sales-pattern/
+// Field-Service/Finance-core, given there in full) + database-schema.md §25-40
+// (every other domain) + architecture.md §7.9-7.15/§17/§58 (Customer Advance,
+// Loan/Investment, Employee Advance, Warranty/Ticket, Draft State, Modules 73-74).
+//
+// Conventions (database-schema.md §9-13, applied without exception below):
+//   - Every table: cuid() string PK — never serial/bigserial/uuid.
+//   - Money: Decimal @db.Decimal(14,2). Quantities: Decimal @db.Decimal(12,2).
+//   - onDelete: Restrict (default posture, esp. anything financial/historical),
+//     Cascade (only for a line/child with zero meaning without its parent),
+//     SetNull (an optional cross-reference where the parent's disappearance
+//     shouldn't destroy the child).
+//   - Soft delete (`deletedAt`) only on master-data/identity tables (database.md
+//     §13) — financial/inventory/loan/advance tables are never deleted, soft or
+//     hard (database.md §1's Rule 2); their only "removal" is a reversal row.
+//   - Single `public` schema, PostgreSQL 15+.
+//
+// Where this session had to reconcile two conflicting drafts of the same model
+// (CompanyLoan, EmployeeAdvance appear once in architecture.md §7.10/§7.11 and
+// again, differently, in database-schema.md §31), the richer architecture.md
+// field set was kept and merged with database-schema.md's specific resolved
+// values — noted inline on each model. Three names appear across the doc set
+// with no field-level spec at all (SavedFilter, ExportJob, PrintPreference,
+// Warranty, WarrantyClaim) — built here from the stated pattern (database-schema.md
+// §9-13) plus what their own narrative sections (architecture.md §7.12, §7.14,
+// §18) say they must hold; flagged inline, not silently invented as fact.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IDENTITY & ACCESS  (database.md §3)
+// ═══════════════════════════════════════════════════════════════
+
+model Branch {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users               User[]
+  customers           Customer[]
+  employees           Employee[]
+  quotations          Quotation[]
+  salesOrders         SalesOrder[]
+  projects            Project[]
+  invoices            Invoice[]
+  serviceAssignments  ServiceAssignment[]
+  journalEntries      JournalEntry[]
+  vouchers            Voucher[]
+  suspenseEntries     SuspenseEntry[]
+  purchaseRequests    PurchaseRequest[]
+  purchaseOrders      PurchaseOrder[]
+  payrollRuns         PayrollRun[]
+  damageLossReports   DamageLossReport[]
+  deliveryChallanReturns DeliveryChallanReturn[]
+  tickets             Ticket[]
+  customerAdvances    CustomerAdvance[]
+  featureFlags        FeatureFlag[]
+  companyLoans        CompanyLoan[]
+
+  @@index([isActive])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  mfaEnabled   Boolean   @default(false)
+  mfaSecret    String?   // encrypted at rest (architecture.md §22's "encryption... at rest for sensitive fields") — set on first MFA enrollment, Phase 2's own addition
+  roleId       String
+  branchId     String?
+  employeeId   String?   @unique
+  isActive     Boolean   @default(true)
+  version      Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  role                Role              @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  branch              Branch?           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  employee            Employee?         @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  approvalsRequested  ApprovalRequest[] @relation("Requester")
+  approvalsApproved   ApprovalRequest[] @relation("Approver")
+  notifications       Notification[]
+  closedProjects      ProjectClosureReport[]
+  refreshTokens       RefreshToken[]
+
+  @@index([branchId, isActive])
+  @@index([roleId])
+}
+
+// Phase 2's own addition to Phase 1's schema — architecture.md §22 says
+// refresh tokens must be "rotated, revocable," which needs a persistence
+// row to revoke (JWT verification alone can't invalidate a still-unexpired
+// token before its natural expiry).
+model RefreshToken {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenFamily String    @unique // one family per login session; every rotation within it reuses this id (api-spec.md §5's "old one invalidated immediately")
+  issuedAt    DateTime  @default(now())
+  revokedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique // SUPER_ADMIN, ADMIN, OPERATIONS_ADMIN, BRANCH_ADMIN, SERVICE_ADMIN, INVENTORY_ADMIN, PROJECT_ADMIN, ACCOUNTS_FINANCE, HR_PAYROLL, BRANCH_MANAGER, SALES_EXECUTIVE, WAREHOUSE_STAFF, TECHNICIAN, CUSTOMER_PORTAL, VENDOR_PORTAL — admin-permission-migration-matrix.md §5's six Admin-family roles plus prd.md §6.1's other four
+  permissions RolePermission[]
+  users       User[]
+}
+
+model Permission {
+  id    String           @id @default(cuid())
+  code  String           @unique // dot-namespaced, e.g. "sales.quotation.create"
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Employee {
+  id                String    @id @default(cuid())
+  employeeCode      String    @unique
+  fullName          String
+  // Fixed (Phase 2, this session): a single `nidNumber @unique` column
+  // cannot hold both an AES-256-GCM ciphertext (non-deterministic — a
+  // random IV means the same NID encrypts to a different string every
+  // time, so `@unique` would never actually catch a duplicate) and be
+  // searchable by exact NID. Split in two: the encrypted blob for
+  // retrieval/decryption, and a deterministic HMAC-SHA256 hash (same
+  // input always produces the same hash, safe to index/unique because a
+  // hash can't be reversed to the original NID) for uniqueness + lookup.
+  nidNumberEncrypted String   @unique // "iv:authTag:ciphertext", see shared/crypto/pii-encryption.ts
+  nidNumberHash      String   @unique // HMAC-SHA256(nidNumber) — what uniqueness/lookup actually key off
+  branchId          String
+  departmentId      String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  branch                Branch                    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  department            Department?               @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  user                  User?
+  technicianAssignments TechnicianAssignment[]
+  custodies             ProductCustody[]
+  technicianAdvances    TechnicianAdvance[]
+  conveyanceBills       ConveyanceBill[]
+  liveLocationLogs      LiveLocationLog[]
+  attendances           Attendance[]
+  leaveRequests         LeaveRequest[]
+  timesheets            Timesheet[]
+  kpis                  KPI[]
+  salaryStructure       SalaryStructure?
+  payslipLines          PayslipLine[]
+  advances              EmployeeAdvance[]
+
+  @@index([branchId, isActive])
+  @@index([departmentId])
+}
+
+model Department {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  isActive     Boolean       @default(true)
+  employees    Employee[]
+  journalLines JournalLine[]
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MASTER DATA  (database.md §3 — Customer shown in full there; Supplier
+// given full schema in database-schema.md §32; Product/Category/Brand/Unit/
+// Warehouse/TaxRate stated only as "identical pattern" — built here from
+// that stated pattern: id / business-key @unique / isActive / audit
+// timestamps / @@index, plus the specific fields each one's own narrative
+// section elsewhere in this doc set requires)
+// ═══════════════════════════════════════════════════════════════
+
+model Customer {
+  id            String   @id @default(cuid())
+  customerCode  String   @unique
+  displayName   String
+  phone         String   @unique
+  branchId      String
+  isServiceOnly Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  version       Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  branch     Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  addresses  CustomerAddress[]
+  quotations Quotation[]
+  salesOrders SalesOrder[]
+  projects   Project[]
+  invoices   Invoice[]
+  tickets    Ticket[]
+  advances   CustomerAdvance[]
+
+  @@index([branchId, isActive])
+  @@index([phone])
+}
+
+model CustomerAddress {
+  id          String   @id @default(cuid())
+  customerId  String
+  label       String
+  addressLine String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model Supplier {
+  id             String            @id @default(cuid())
+  supplierCode   String            @unique
+  companyName    String
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deletedAt      DateTime?
+
+  contacts       SupplierContact[]
+  purchaseOrders PurchaseOrder[]
+
+  @@index([isActive])
+}
+
+model SupplierContact {
+  id         String   @id @default(cuid())
+  supplierId String
+  name       String
+  phone      String
+  isPrimary  Boolean  @default(false)
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+}
+
+model Category {
+  id            String        @id @default(cuid())
+  name          String        @unique
+  isActive      Boolean       @default(true)
+  products      Product[]
+  subCategories SubCategory[]
+}
+
+model SubCategory {
+  id         String    @id @default(cuid())
+  name       String
+  categoryId String
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  products   Product[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+model Brand {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  isActive Boolean   @default(true)
+  products Product[]
+}
+
+model Unit {
+  id       String    @id @default(cuid())
+  code     String    @unique // "PCS", "MTR", "SET"
+  name     String
+  isActive Boolean   @default(true)
+  products Product[]
+}
+
+model TaxRate {
+  id       String  @id @default(cuid())
+  name     String  @unique // "VAT 15%"
+  ratePercent Decimal @db.Decimal(5, 2)
+  isActive Boolean @default(true)
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  sku          String   @unique
+  name         String
+  categoryId   String?
+  subCategoryId String?
+  brandId      String?
+  unitId       String?
+  costPrice    Decimal  @db.Decimal(14, 2) @default(0) // current cost basis — DamageLossLine/SKULifecycleEvent snapshot this at time of use, never retroactively recompute (architecture.md §58.2)
+  sellingPrice Decimal  @db.Decimal(14, 2) @default(0)
+  isServiceItem Boolean @default(false) // true for a labour/service line item with no physical stock
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  category         Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subCategory      SubCategory?         @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  brand            Brand?               @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  unit             Unit?                @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  quotationLines   QuotationLine[]
+  salesOrderLines  SalesOrderLine[]
+  stockLedgers     StockLedger[]
+  stockAdjustments StockAdjustment[]
+  stockTransfers   StockTransfer[]
+  batches          Batch[]
+  serialNumbers    SerialNumber[]
+  custodies        ProductCustody[]
+  purchaseRequestLines PurchaseRequestLine[]
+  purchaseOrderLines   PurchaseOrderLine[]
+  grnLines             GoodsReceiptNoteLine[]
+  damageLossLines  DamageLossLine[]
+  challanLines     DeliveryChallanLine[]
+  projectItems     ProjectItem[]
+
+  @@index([isActive])
+  @@index([categoryId])
+  @@index([subCategoryId])
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  branchId  String?
+  isActive  Boolean  @default(true)
+
+  stockLedgers      StockLedger[]
+  stockAdjustments  StockAdjustment[]
+  damageLossReports DamageLossReport[]
+
+  @@index([isActive])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SALES & QUOTATION  (database.md §3: Quotation/QuotationLine full;
+// database-schema.md §27: SalesOrder→CreditNote full; architecture.md
+// §58.1: Module 73 Challan Return full)
+// ═══════════════════════════════════════════════════════════════
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model Quotation {
+  id               String          @id @default(cuid())
+  quotationNumber  String          @unique
+  customerId       String
+  branchId         String
+  salesExecutiveId String
+  status           QuotationStatus @default(DRAFT)
+  validUntil       DateTime
+  grandTotal       Decimal         @db.Decimal(14, 2)
+  supersedesId     String?         @unique
+  ticketId         String?         @unique
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch     Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  lines      QuotationLine[]
+  supersedes Quotation?  @relation("QuotationRevision", fields: [supersedesId], references: [id], onDelete: SetNull)
+  revisedBy  Quotation?  @relation("QuotationRevision")
+  ticket     Ticket?     @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  salesOrder SalesOrder?
+
+  @@index([branchId, status])
+  @@index([customerId])
+  @@index([validUntil])
+}
+
+model QuotationLine {
+  id          String   @id @default(cuid())
+  quotationId String
+  productId   String?
+  description String
+  quantity    Decimal  @db.Decimal(10, 2)
+  unitPrice   Decimal  @db.Decimal(14, 2)
+  lineTotal   Decimal  @db.Decimal(14, 2)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([quotationId])
+}
+
+model SalesOrder {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique
+  quotationId String?  @unique
+  customerId  String
+  branchId    String
+  orderType   String   @default("STANDARD") // STANDARD | DIRECT_SALE | PROJECT
+  grandTotal  Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+
+  quotation Quotation?        @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  customer  Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch    Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  project   Project?
+  lines     SalesOrderLine[]
+  challans  DeliveryChallan[]
+  // No direct `invoices` relation: Invoice.sourceId is polymorphic
+  // (SALES_ORDER | SERVICE_ASSIGNMENT, database-schema.md §10's pattern) —
+  // like every other polymorphic pair in this schema, it stays a plain
+  // indexed field, not a real FK, and is resolved at the Application layer.
+
+  @@index([branchId, customerId])
+}
+
+// Named by database-schema.md §27's fulfillment view (as the join target)
+// but never given its own field list anywhere in the doc set — built here
+// from the same line-item pattern QuotationLine/VoucherLine/JournalLine all
+// share (database-schema.md §9's rule), plus exactly the two fields
+// architecture.md §58.1's view needs to exist on it.
+model SalesOrderLine {
+  id           String  @id @default(cuid())
+  salesOrderId String
+  productId    String?
+  description  String
+  quantity     Decimal @db.Decimal(10, 2)
+  unitPrice    Decimal @db.Decimal(14, 2)
+  lineTotal    Decimal @db.Decimal(14, 2)
+
+  salesOrder      SalesOrder            @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product         Product?              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  challanLines    DeliveryChallanLine[]
+
+  @@index([salesOrderId])
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  projectCode   String        @unique // PRJ-YYYY-XXXX
+  name          String
+  description   String?
+  customerId    String
+  branchId      String
+  status        ProjectStatus @default(ACTIVE)
+  startDate     DateTime      @db.Date
+  endDate       DateTime?     @db.Date
+  siteLocation  String?
+  budgetAmount  Decimal       @db.Decimal(14, 2) @default(0)
+  salesOrderId  String?       @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  customer      Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  salesOrder    SalesOrder?     @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
+  items         ProjectItem[]
+  challans      DeliveryChallan[]
+
+  @@index([branchId, status])
+  @@index([customerId])
+}
+
+model ProjectItem {
+  id          String   @id @default(cuid())
+  projectId   String
+  productId   String
+  description String?
+  plannedQty  Decimal  @db.Decimal(12, 2)
+  unitPrice   Decimal  @db.Decimal(14, 2)
+  totalAmount Decimal  @db.Decimal(14, 2)
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([projectId])
+  @@index([productId])
+}
+
+model DeliveryChallan {
+  id            String   @id @default(cuid())
+  challanNumber String   @unique
+  salesOrderId  String
+  projectId     String?
+  invoiceId     String?
+  billingStatus String   @default("UNBILLED") // UNBILLED | BILLED
+  dispatchedAt  DateTime @default(now())
+
+  salesOrder SalesOrder              @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
+  project    Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  invoice    Invoice?                @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  lines      DeliveryChallanLine[]
+  returns    DeliveryChallanReturn[]
+
+  @@index([salesOrderId])
+  @@index([projectId])
+  @@index([invoiceId])
+  @@index([billingStatus])
+}
+
+model DeliveryChallanLine {
+  id               String  @id @default(cuid())
+  challanId        String
+  salesOrderLineId String
+  productId        String
+  serialNumberId   String?
+  batchId          String?
+  quantity         Decimal @db.Decimal(12, 2)
+
+  challan        DeliveryChallan             @relation(fields: [challanId], references: [id], onDelete: Cascade)
+  salesOrderLine SalesOrderLine              @relation(fields: [salesOrderLineId], references: [id], onDelete: Restrict)
+  product        Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  serialNumber   SerialNumber?               @relation(fields: [serialNumberId], references: [id], onDelete: SetNull)
+  batch          Batch?                      @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  returnLines    DeliveryChallanReturnLine[]
+
+  @@index([challanId])
+  @@index([salesOrderLineId])
+}
+
+enum ChallanReturnCondition {
+  GOOD
+  DAMAGED
+  FAULTY
+  MISSING_PARTS
+}
+
+model DeliveryChallanReturn {
+  id           String   @id @default(cuid())
+  returnNumber String   @unique // RET-<branch>-<year>-<seq>, database-schema.md §27
+  challanId    String
+  branchId     String
+  createdAt    DateTime @default(now())
+
+  branch     Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  challan    DeliveryChallan             @relation(fields: [challanId], references: [id], onDelete: Restrict)
+  lines      DeliveryChallanReturnLine[]
+
+  @@index([challanId])
+}
+
+model DeliveryChallanReturnLine {
+  id                 String                 @id @default(cuid())
+  returnId           String
+  challanLineId      String
+  quantity           Decimal                @db.Decimal(12, 2)
+  condition          ChallanReturnCondition
+  damageLossReportId String?
+
+  return       DeliveryChallanReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  challanLine  DeliveryChallanLine   @relation(fields: [challanLineId], references: [id], onDelete: Restrict)
+  damageLossReport DamageLossReport? @relation(fields: [damageLossReportId], references: [id], onDelete: SetNull)
+
+  @@index([returnId])
+  // @@check(constraint: "quantity > 0", name: "return_line_positive_quantity") (enforced at DB level)
+}
+
+model Invoice {
+  id             String   @id @default(cuid())
+  invoiceNumber  String   @unique
+  sourceType     String   // SALES_ORDER | SERVICE_ASSIGNMENT (Module 72)
+  sourceId       String
+  customerId     String
+  branchId       String
+  grandTotal     Decimal  @db.Decimal(14, 2)
+  status         String   // DRAFT | POSTED | CANCELLED
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+
+  customer          Customer                    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch            Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  challans          DeliveryChallan[]
+  payments          Payment[]
+  creditNotes       CreditNote[]
+  advanceAdjustments AdvanceAdjustment[]
+  paymentGatewayTxns PaymentGatewayTransaction[]
+
+  @@index([sourceType, sourceId])
+  @@index([branchId, customerId, status])
+}
+
+model Payment {
+  id                    String   @id @default(cuid())
+  invoiceId             String
+  amount                Decimal  @db.Decimal(14, 2)
+  method                String   // CASH | BANK | SSLCOMMERZ | CHEQUE
+  gatewayTransactionId  String?  @unique
+  receivedAt            DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+}
+
+model CreditNote {
+  id               String   @id @default(cuid())
+  creditNoteNumber String   @unique
+  invoiceId        String
+  amount           Decimal  @db.Decimal(14, 2)
+  reason           String
+  createdAt        DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FIELD SERVICE  (database.md §3, full — the platform's signature flow)
+// ═══════════════════════════════════════════════════════════════
+
+enum AssignmentStatus {
+  ASSIGNED
+  ACCEPTED          // added by architecture.md §58.3 (Module 75) — between ASSIGNED and IN_PROGRESS
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED          // added by §58.3 — after COMPLETED
+  CUSTOMER_ACCEPTED // added by §58.3 — after VERIFIED
+  CLOSED
+  CANCELLED
+}
+enum CustodyStatus {
+  ASSIGNED
+  USED
+  RETURNED
+  DAMAGED
+  LOST
+  SOLD_TO_CUSTOMER
+}
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ServiceAssignment {
+  id               String           @id @default(cuid())
+  assignmentNumber String           @unique
+  sourceType       String           // SALES_ORDER | INVOICE | TICKET
+  sourceId         String
+  branchId         String
+  status           AssignmentStatus @default(ASSIGNED)
+  version          Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  branch     Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  technicians TechnicianAssignment[]
+  custody    ProductCustody[]
+  advances   TechnicianAdvance[]
+  conveyance ConveyanceBill[]
+  closure    ProjectClosureReport?
+  timesheets Timesheet[]
+  reconciliation ProjectAdvanceConveyanceReconciliation?
+  liveLocationLogs LiveLocationLog[]
+  ticket     Ticket?
+
+  @@index([branchId, status])
+  @@index([sourceType, sourceId])
+}
+
+model TechnicianAssignment {
+  id           String    @id @default(cuid())
+  assignmentId String
+  employeeId   String
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+
+  assignment ServiceAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  technician Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@index([employeeId])
+}
+
+model ProductCustody {
+  id             String        @id @default(cuid())
+  assignmentId   String
+  serialNumberId String?
+  productId      String
+  quantity       Decimal       @db.Decimal(10, 2)
+  status         CustodyStatus @default(ASSIGNED)
+  custodianId    String
+  createdAt      DateTime      @default(now())
+
+  assignment   ServiceAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  serialNumber SerialNumber?     @relation(fields: [serialNumberId], references: [id], onDelete: SetNull)
+  custodian    Employee          @relation(fields: [custodianId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@index([custodianId, status])
+}
+
+model TechnicianAdvance {
+  id           String   @id @default(cuid())
+  assignmentId String
+  employeeId   String
+  amountIssued Decimal  @db.Decimal(14, 2)
+  issuedAt     DateTime @default(now())
+
+  assignment ServiceAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  technician Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId])
+  @@index([employeeId])
+}
+
+model ConveyanceBill {
+  id             String         @id @default(cuid())
+  assignmentId   String
+  employeeId     String
+  totalClaimed   Decimal        @db.Decimal(14, 2)
+  approvalStatus ApprovalStatus @default(PENDING)
+  receiptFileId  String?
+  submittedAt    DateTime       @default(now())
+
+  assignment ServiceAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  technician Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId, approvalStatus])
+}
+
+model ProjectClosureReport {
+  id                      String    @id @default(cuid())
+  assignmentId            String    @unique
+  customerSignatureFileId String?
+  closedAt                DateTime?
+  closedById              String
+
+  assignment ServiceAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  closedBy   User              @relation(fields: [closedById], references: [id], onDelete: Restrict)
+
+  @@index([closedAt])
+}
+
+model LiveLocationLog {
+  id           String   @id @default(cuid())
+  employeeId   String
+  assignmentId String?
+  latitude     Decimal  @db.Decimal(9, 6)
+  longitude    Decimal  @db.Decimal(9, 6)
+  recordedAt   DateTime @default(now())
+
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  assignment ServiceAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  // Retention period still an open policy question (dfd.md §16, database.md
+  // §21) — schema is final, retention is not.
+  @@index([employeeId, recordedAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WARRANTY & TICKET  (Ticket: architecture.md §7.12, full. Warranty/
+// WarrantyClaim: named only narratively there — "Warranty, WarrantyClaim,
+// linked to SerialNumber and, when field work is needed, to
+// ServiceAssignment. A warranty claim also writes a SKULifecycleEvent."
+// Built here from that description plus the standard pattern; flagged, not
+// silently treated as if the source gave field-level detail it didn't.)
+// ═══════════════════════════════════════════════════════════════
+
+enum TicketType {
+  WARRANTY_CLAIM
+  PAID_SERVICE_REQUEST
+}
+enum TicketStatus {
+  OPEN
+  QUOTE_PENDING
+  QUOTE_ACCEPTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model Ticket {
+  id                   String       @id @default(cuid())
+  ticketNumber         String       @unique
+  ticketType           TicketType
+  customerId           String
+  branchId             String
+  serialNumberId       String?      // required for WARRANTY_CLAIM, null for PAID_SERVICE_REQUEST — enforced at Application layer
+  description          String
+  status               TicketStatus @default(OPEN)
+  serviceAssignmentId  String?      @unique
+  createdAt            DateTime     @default(now())
+  closedAt             DateTime?
+
+  customer          Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch            Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  serialNumber      SerialNumber?      @relation(fields: [serialNumberId], references: [id], onDelete: SetNull)
+  serviceQuotation  Quotation?
+  serviceAssignment ServiceAssignment? @relation(fields: [serviceAssignmentId], references: [id], onDelete: SetNull)
+  warrantyClaims    WarrantyClaim[]
+
+  @@index([branchId, status])
+  @@index([customerId])
+}
+
+enum WarrantyStatus {
+  ACTIVE
+  EXPIRED
+  VOIDED
+}
+
+model Warranty {
+  id             String         @id @default(cuid())
+  serialNumberId String         @unique
+  startDate      DateTime       @db.Date
+  endDate        DateTime       @db.Date
+  termMonths     Int
+  status         WarrantyStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+
+  serialNumber SerialNumber    @relation(fields: [serialNumberId], references: [id], onDelete: Restrict)
+  claims       WarrantyClaim[]
+
+  @@index([status])
+}
+
+enum WarrantyClaimOutcome {
+  REPLACED
+  REPAIRED
+  REJECTED
+}
+
+model WarrantyClaim {
+  id         String                @id @default(cuid())
+  warrantyId String
+  ticketId   String
+  outcome    WarrantyClaimOutcome?
+  raisedAt   DateTime              @default(now())
+  resolvedAt DateTime?
+
+  warranty Warranty @relation(fields: [warrantyId], references: [id], onDelete: Restrict)
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  // A warranty claim also writes a SKULifecycleEvent
+  // (WARRANTY_CLAIM_RAISED / REPLACED / REPAIRED) — architecture.md §7.12;
+  // done at the Application layer via SerialNumber.events, not a direct FK
+  // here, since SKULifecycleEvent's own polymorphic sourceType/sourceId
+  // pattern (database-schema.md §26) already covers "what caused this event."
+  @@index([warrantyId])
+  @@index([ticketId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FINANCE & ACCOUNTING  (ChartOfAccounts/JournalEntry/JournalLine:
+// database.md §3, full. Voucher→BankTransactionProof: database-schema.md
+// §25, full.)
+// ═══════════════════════════════════════════════════════════════
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+model ChartOfAccounts {
+  id          String   @id @default(cuid())
+  accountCode Int      @unique
+  name        String
+  accountType String   // ASSET | LIABILITY | EQUITY | REVENUE | COGS | EXPENSE | OTHER
+  isActive    Boolean  @default(true)
+
+  journalLines JournalLine[]
+  voucherLines VoucherLine[]
+
+  @@index([accountType])
+}
+
+model JournalEntry {
+  id             String        @id @default(cuid())
+  journalNumber  String        @unique
+  sourceModule   String        // "SALES" | "PROCUREMENT" | "SERVICE_OPS" | "PAYROLL" | "DAMAGE_LOSS" | ...
+  sourceId       String
+  branchId       String
+  fiscalPeriodId String
+  status         JournalStatus @default(DRAFT)
+  idempotencyKey String        @unique
+  postedAt       DateTime?
+  postedById     String?
+  reversalOfId   String?       @unique
+  createdAt      DateTime      @default(now())
+
+  branch         Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  fiscalPeriod   FiscalPeriod   @relation(fields: [fiscalPeriodId], references: [id], onDelete: Restrict)
+  lines          JournalLine[]
+  reversalOf     JournalEntry?  @relation("Reversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy     JournalEntry?  @relation("Reversal")
+  vouchers       Voucher[]
+
+  @@index([sourceModule, sourceId])
+  @@index([branchId, fiscalPeriodId])
+  @@index([status])
+}
+
+model JournalLine {
+  id             String   @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  debit          Decimal  @db.Decimal(14, 2) @default(0)
+  credit         Decimal  @db.Decimal(14, 2) @default(0)
+  departmentId   String?
+  projectId      String?  // e.g. a ServiceAssignment id, for project-wise P&L
+  customerId     String?
+  supplierId     String?
+
+  journalEntry JournalEntry    @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      ChartOfAccounts @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  department   Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@index([projectId])
+  // @@check(constraint: "debit >= 0 AND credit >= 0 AND NOT (debit > 0 AND credit > 0)", name: "journal_line_single_sided") (enforced at DB level)
+}
+
+// Fiscal year = calendar year (Jan-Dec) — resolved, prd.md §14 /
+// Accounting_and_Finance_Full_Specification.md §57.2. No foreign-currency
+// fields anywhere in this schema — also resolved out of scope, same §14 /
+// Finance spec §57.4.
+model FiscalPeriod {
+  id        String   @id @default(cuid())
+  year      Int      @unique
+  startDate DateTime @db.Date // always Jan 1
+  endDate   DateTime @db.Date // always Dec 31
+  isClosed  Boolean  @default(false)
+  closedAt  DateTime?
+
+  journalEntries JournalEntry[]
+
+  @@index([year])
+}
+
+enum VoucherType {
+  CASH_RECEIPT
+  CASH_PAYMENT
+  BANK_RECEIPT
+  BANK_PAYMENT
+  JOURNAL
+  CONTRA
+  SALES
+  PURCHASE
+  SALES_RETURN
+  PURCHASE_RETURN
+  EXPENSE
+  ADJUSTMENT
+}
+enum VoucherStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+model Voucher {
+  id             String        @id @default(cuid())
+  voucherNumber  String        @unique
+  voucherType    VoucherType
+  status         VoucherStatus @default(DRAFT)
+  branchId       String
+  journalEntryId String?       @unique
+  reversalOfId   String?       @unique
+  createdById    String
+  createdAt      DateTime      @default(now())
+
+  branch       Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  lines        VoucherLine[]
+  journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  reversalOf   Voucher?      @relation("VoucherReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy   Voucher?      @relation("VoucherReversal")
+
+  @@index([branchId, voucherType, status])
+}
+
+model VoucherLine {
+  id        String  @id @default(cuid())
+  voucherId String
+  accountId String
+  debit     Decimal @db.Decimal(14, 2) @default(0)
+  credit    Decimal @db.Decimal(14, 2) @default(0)
+  narration String?
+
+  voucher Voucher         @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  account ChartOfAccounts @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([voucherId])
+  // @@check(constraint: "debit >= 0 AND credit >= 0 AND NOT (debit > 0 AND credit > 0)", name: "voucher_line_single_sided") (enforced at DB level)
+}
+
+model SuspenseEntry {
+  id                   String    @id @default(cuid())
+  branchId             String
+  amount               Decimal   @db.Decimal(14, 2)
+  reason               String
+  agingDays            Int       @default(0)
+  resolvedAt           DateTime?
+  resolvedToAccountId  String?
+  createdAt            DateTime  @default(now())
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([branchId, resolvedAt])
+}
+
+model ChequeRegisterEntry {
+  id                      String    @id @default(cuid())
+  chequeNumber            String
+  bankProofId             String    @unique
+  amount                  Decimal   @db.Decimal(14, 2)
+  status                  String    // PENDING_CLEARANCE | CLEARED | BOUNCED
+  bouncedAt               DateTime?
+  reversalJournalEntryId  String?   @unique
+
+  bankProof BankTransactionProof @relation(fields: [bankProofId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+}
+
+model BankTransactionProof {
+  id                  String   @id @default(cuid())
+  sourceModule        String
+  sourceId            String
+  accountNumberMasked String   // last 4 digits only — full number never stored, ever
+  proofFileId         String
+  uploadedById        String
+  uploadedAt          DateTime @default(now())
+
+  chequeRegisterEntry ChequeRegisterEntry?
+
+  @@index([sourceModule, sourceId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMER ADVANCE / PARTIAL PAYMENT  (architecture.md §7.9, full)
+// ═══════════════════════════════════════════════════════════════
+
+enum AdvanceStatus {
+  RECEIVED
+  PARTIALLY_ADJUSTED
+  FULLY_ADJUSTED
+  REFUNDED
+}
+
+model CustomerAdvance {
+  id           String        @id @default(cuid())
+  customerId   String
+  projectRef   String?       // ServiceAssignment or SalesOrder id — polymorphic, not a real FK
+  amount       Decimal       @db.Decimal(14, 2)
+  receivedDate DateTime      @default(now())
+  method       String        // CASH | BANK | MOBILE_BANKING | CARD
+  status       AdvanceStatus @default(RECEIVED)
+  branchId     String
+  receivedById String
+  createdAt    DateTime      @default(now())
+
+  customer    Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch      Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  adjustments AdvanceAdjustment[]
+
+  @@index([customerId, status])
+  @@index([branchId])
+}
+
+model AdvanceAdjustment {
+  id             String   @id @default(cuid())
+  advanceId      String
+  invoiceId      String
+  amountAdjusted Decimal  @db.Decimal(14, 2)
+  adjustedAt     DateTime @default(now())
+  adjustedById   String
+
+  advance CustomerAdvance @relation(fields: [advanceId], references: [id], onDelete: Restrict)
+  invoice Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([advanceId])
+  @@index([invoiceId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INVENTORY  (database-schema.md §26, full; Module 74 Damage/Loss:
+// architecture.md §58.2, full)
+// ═══════════════════════════════════════════════════════════════
+
+enum SKULifecycleStage {
+  RECEIVED
+  IN_STOCK
+  RESERVED
+  SOLD
+  ISSUED_TO_TECHNICIAN
+  INSTALLED
+  RETURNED_TO_SUPPLIER
+  RETURNED_BY_CUSTOMER
+  RETIRED_WARRANTY
+  DAMAGED_WRITTEN_OFF
+  // Module 72 warranty-claim additions (architecture.md §7.12):
+  WARRANTY_CLAIM_RAISED
+  REPLACED
+  REPAIRED
+}
+
+model StockLedger {
+  id             String   @id @default(cuid())
+  productId      String
+  warehouseId    String
+  quantityOnHand Decimal  @db.Decimal(12, 2) @default(0)
+  updatedAt      DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, warehouseId])
+  // @@check(constraint: "\"quantityOnHand\" >= 0", name: "stock_non_negative") (enforced at DB level)
+}
+
+model StockAdjustment {
+  id             String         @id @default(cuid())
+  productId      String
+  warehouseId    String
+  quantityDelta  Decimal        @db.Decimal(12, 2) // signed — the one deliberate exception to "quantity >= 0"
+  reason         String
+  approvalStatus ApprovalStatus @default(PENDING)
+  createdById    String
+  createdAt      DateTime       @default(now())
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([warehouseId, approvalStatus])
+}
+
+model StockTransfer {
+  id              String    @id @default(cuid())
+  productId       String
+  quantity        Decimal   @db.Decimal(12, 2)
+  fromWarehouseId String
+  toWarehouseId   String
+  status          String    // DISPATCHED | IN_TRANSIT | RECEIVED | DISCREPANT
+  dispatchedAt    DateTime  @default(now())
+  receivedAt      DateTime?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([fromWarehouseId, status])
+  @@index([toWarehouseId, status])
+}
+
+model Batch {
+  id         String    @id @default(cuid())
+  productId  String
+  batchCode  String
+  expiryDate DateTime?
+
+  product      Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  challanLines DeliveryChallanLine[]
+  damageLossLines DamageLossLine[]
+  grnLines     GoodsReceiptNoteLine[]
+
+  @@unique([productId, batchCode])
+}
+
+model SerialNumber {
+  id           String            @id @default(cuid())
+  productId    String
+  serial       String            @unique
+  currentStage SKULifecycleStage @default(RECEIVED)
+
+  product      Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  events       SKULifecycleEvent[]
+  custodies    ProductCustody[]
+  challanLines DeliveryChallanLine[]
+  tickets      Ticket[]
+  warranty     Warranty?
+  damageLossLines DamageLossLine[]
+  grnLines     GoodsReceiptNoteLine[]
+
+  @@index([currentStage])
+}
+
+model SKULifecycleEvent {
+  id             String            @id @default(cuid())
+  serialNumberId String
+  eventType      SKULifecycleStage
+  sourceModule   String
+  sourceId       String
+  occurredAt     DateTime          @default(now())
+
+  serialNumber SerialNumber @relation(fields: [serialNumberId], references: [id], onDelete: Restrict)
+
+  @@index([serialNumberId, occurredAt])
+}
+
+enum DamageLossDisposition {
+  SCRAP
+  RETURN_TO_STOCK
+  REPAIR
+  RMA
+  WRITE_OFF
+}
+enum DamageLossStatus {
+  REPORTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  DISPOSED
+}
+
+model DamageLossReport {
+  id             String                  @id @default(cuid())
+  reportNumber   String                  @unique
+  branchId       String
+  warehouseId    String
+  reason         String
+  evidenceFileId String?
+  status         DamageLossStatus        @default(REPORTED)
+  disposition    DamageLossDisposition?
+  grossLoss      Decimal                 @db.Decimal(14, 2) @default(0)
+  recovery       Decimal                 @db.Decimal(14, 2) @default(0)
+  netLoss        Decimal                 @db.Decimal(14, 2) @default(0)
+  reportedById   String
+  approvedById   String?
+  createdAt      DateTime                @default(now())
+
+  branch    Branch                      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warehouse Warehouse                   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  lines     DamageLossLine[]
+  challanReturnLines DeliveryChallanReturnLine[]
+
+  @@index([branchId, status])
+  // @@check(constraint: "\"reportedById\" != \"approvedById\"", name: "damage_loss_no_self_approval") (enforced at DB level)
+}
+
+model DamageLossLine {
+  id             String  @id @default(cuid())
+  reportId       String
+  productId      String
+  serialNumberId String?
+  batchId        String?
+  quantity       Decimal @db.Decimal(12, 2)
+  costBasis      Decimal @db.Decimal(14, 2) // snapshot at report time — never recomputed retroactively
+
+  report       DamageLossReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  product      Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  serialNumber SerialNumber?    @relation(fields: [serialNumberId], references: [id], onDelete: SetNull)
+  batch        Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([reportId])
+}
+// Posting on approval, not on report (architecture.md §58.2): a JournalEntry
+// (sourceModule="DAMAGE_LOSS") is only created when status -> APPROVED,
+// inside the same transaction as that status change. Employee liability is
+// never derived automatically — a separate EmployeeAdvance references this
+// report's id for traceability if BTS recovers a loss from an employee.
+
+// ═══════════════════════════════════════════════════════════════
+// PROCUREMENT  (database-schema.md §28, full)
+// ═══════════════════════════════════════════════════════════════
+
+model PurchaseRequest {
+  id            String         @id @default(cuid())
+  requestNumber String         @unique
+  branchId      String
+  requestedById String
+  status        ApprovalStatus @default(PENDING)
+  createdAt     DateTime       @default(now())
+
+  branch        Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  lines         PurchaseRequestLine[]
+  purchaseOrder PurchaseOrder?
+
+  @@index([branchId, status])
+}
+
+// Fixed (Phase 4, this session): the original PurchaseRequest model had no
+// way to say what was actually being requested — a requisition with no
+// line items doesn't correspond to anything a real Procurement Officer
+// would submit. Same id/productId/quantity shape as every other line-item
+// table in this schema (QuotationLine, SalesOrderLine, etc.).
+model PurchaseRequestLine {
+  id                String  @id @default(cuid())
+  purchaseRequestId String
+  productId         String
+  quantity          Decimal @db.Decimal(12, 2)
+  notes             String?
+
+  purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  product         Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseRequestId])
+}
+
+model PurchaseOrder {
+  id                 String   @id @default(cuid())
+  poNumber           String   @unique
+  purchaseRequestId  String?  @unique
+  supplierId         String
+  branchId           String
+  grandTotal         Decimal  @db.Decimal(14, 2)
+  createdAt          DateTime @default(now())
+
+  purchaseRequest PurchaseRequest?    @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
+  supplier        Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  branch          Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  lines           PurchaseOrderLine[]
+  grns            GoodsReceiptNote[]
+  invoices        PurchaseInvoice[]
+
+  @@index([branchId, supplierId])
+}
+
+// Added alongside PurchaseRequestLine (this session) — same gap, same fix:
+// a PO with no line items doesn't say what's being purchased.
+model PurchaseOrderLine {
+  id              String  @id @default(cuid())
+  purchaseOrderId String
+  productId       String
+  quantity        Decimal @db.Decimal(12, 2)
+  unitPrice       Decimal @db.Decimal(14, 2)
+  lineTotal       Decimal @db.Decimal(14, 2)
+
+  purchaseOrder PurchaseOrder            @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  grnLines      GoodsReceiptNoteLine[]
+
+  @@index([purchaseOrderId])
+}
+
+model GoodsReceiptNote {
+  id              String   @id @default(cuid())
+  grnNumber       String   @unique
+  purchaseOrderId String
+  status          String   // COMPLETE | PARTIAL | DISCREPANT
+  receivedAt      DateTime @default(now())
+  receivedById    String
+
+  purchaseOrder PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  lines            GoodsReceiptNoteLine[]
+  purchaseInvoices PurchaseInvoice[]
+  purchaseReturns  PurchaseReturn[]
+
+  @@index([purchaseOrderId, status])
+}
+
+// Added alongside PurchaseRequestLine/PurchaseOrderLine (this session) —
+// prd.md §9.9's discrepancy handling (short-shipped/damaged/wrong-SKU) is
+// meaningless without a per-line record of what was actually received vs.
+// what the PO line said.
+enum GrnLineCondition {
+  GOOD
+  DAMAGED
+  SHORT
+  WRONG_SKU
+}
+
+model GoodsReceiptNoteLine {
+  id                  String           @id @default(cuid())
+  grnId               String
+  purchaseOrderLineId String
+  productId           String
+  quantityReceived    Decimal          @db.Decimal(12, 2)
+  condition           GrnLineCondition @default(GOOD)
+  serialNumberId      String?
+  batchId             String?
+
+  grn               GoodsReceiptNote  @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  purchaseOrderLine PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id], onDelete: Restrict)
+  product           Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  serialNumber      SerialNumber?     @relation(fields: [serialNumberId], references: [id], onDelete: SetNull)
+  batch             Batch?            @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  purchaseReturnLines PurchaseReturnLine[]
+
+  @@index([grnId])
+  @@index([purchaseOrderLineId])
+}
+
+model PurchaseInvoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  purchaseOrderId String
+  grnId           String?
+  grandTotal      Decimal  @db.Decimal(14, 2)
+  idempotencyKey  String   @unique
+  createdAt       DateTime @default(now())
+
+  purchaseOrder PurchaseOrder     @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  grn           GoodsReceiptNote? @relation(fields: [grnId], references: [id], onDelete: SetNull)
+  payments      SupplierPayment[]
+
+  @@index([purchaseOrderId])
+}
+
+model SupplierPayment {
+  id                String   @id @default(cuid())
+  purchaseInvoiceId String
+  amount            Decimal  @db.Decimal(14, 2)
+  method            String
+  idempotencyKey    String   @unique // added this session — api-spec.md §14: "the payment endpoint requires Idempotency-Key (§7) since it's a financial write." The original model had no column to actually store it, same gap-class as PurchaseRequest/PurchaseOrder/GRN's missing line items.
+  paidAt            DateTime @default(now())
+
+  purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseInvoiceId])
+}
+
+model PurchaseReturn {
+  id             String         @id @default(cuid())
+  returnNumber   String         @unique
+  grnId          String
+  reason         String
+  approvalStatus ApprovalStatus @default(PENDING)
+  createdById    String
+  createdAt      DateTime       @default(now())
+
+  grn   GoodsReceiptNote     @relation(fields: [grnId], references: [id], onDelete: Restrict)
+  lines PurchaseReturnLine[]
+
+  @@index([grnId])
+}
+
+// Fixed alongside SupplierPayment's idempotency key (this session) — a
+// single `quantity` field on PurchaseReturn itself can't say WHICH
+// product from a multi-line GRN is being returned, same gap-class as
+// PurchaseRequest/PurchaseOrder/GRN before this phase's earlier fixes.
+model PurchaseReturnLine {
+  id                     String  @id @default(cuid())
+  purchaseReturnId       String
+  goodsReceiptNoteLineId String
+  quantity               Decimal @db.Decimal(12, 2)
+
+  purchaseReturn       PurchaseReturn       @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  goodsReceiptNoteLine GoodsReceiptNoteLine @relation(fields: [goodsReceiptNoteLineId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseReturnId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HR & PAYROLL  (database-schema.md §30, full)
+// ═══════════════════════════════════════════════════════════════
+
+enum PayrollRunStatus {
+  DRAFT
+  PROCESSING
+  FINALIZED
+  PAID
+}
+enum ReconciliationOutcome {
+  SHORTFALL_DEDUCT
+  EXCESS_REIMBURSE
+  BALANCED
+}
+
+model Attendance {
+  id         String    @id @default(cuid())
+  employeeId String
+  date       DateTime  @db.Date
+  checkIn    DateTime?
+  checkOut   DateTime?
+  status     String    // PRESENT | ABSENT | HALF_DAY | ON_LEAVE
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, date])
+  @@index([employeeId, date])
+}
+
+model LeaveRequest {
+  id             String         @id @default(cuid())
+  employeeId     String
+  startDate      DateTime       @db.Date
+  endDate        DateTime       @db.Date
+  approvalStatus ApprovalStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([employeeId, approvalStatus])
+}
+
+model Timesheet {
+  id           String   @id @default(cuid())
+  employeeId   String
+  assignmentId String?
+  date         DateTime @db.Date
+  hours        Decimal  @db.Decimal(4, 2)
+
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  assignment ServiceAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId, date])
+}
+
+model KPI {
+  id          String   @id @default(cuid())
+  employeeId  String
+  metric      String
+  value       Decimal  @db.Decimal(10, 2)
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([employeeId, periodStart])
+}
+
+model SalaryStructure {
+  id            String    @id @default(cuid())
+  employeeId    String    @unique
+  basicSalary   Decimal   @db.Decimal(14, 2)
+  allowances    Json      // flexible — allowance types vary too much for a fixed column set
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([employeeId, effectiveFrom])
+}
+
+model AttendanceSalaryRule {
+  id                    String  @id @default(cuid())
+  ruleName              String
+  deductionPerAbsentDay Decimal @db.Decimal(14, 2)
+  isActive              Boolean @default(true)
+}
+
+model PayrollRun {
+  id          String           @id @default(cuid())
+  runNumber   String           @unique
+  branchId    String
+  periodStart DateTime         @db.Date
+  periodEnd   DateTime         @db.Date
+  status      PayrollRunStatus @default(DRAFT)
+  version     Int              @default(0)
+
+  branch   Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  payslips PayslipLine[]
+  employeeLoanInstallments EmployeeLoanInstallment[]
+
+  @@index([branchId, status])
+}
+
+model PayslipLine {
+  id                       String  @id @default(cuid())
+  payrollRunId             String
+  employeeId               String
+  grossPay                 Decimal @db.Decimal(14, 2)
+  deductions               Decimal @db.Decimal(14, 2)
+  reconciliationAdjustment Decimal @db.Decimal(14, 2) @default(0)
+  netPay                   Decimal @db.Decimal(14, 2) // computed at the Application layer, not a generated column
+
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Restrict)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([payrollRunId, employeeId])
+  @@index([employeeId])
+}
+
+model ProjectAdvanceConveyanceReconciliation {
+  id                    String                @id @default(cuid())
+  assignmentId          String                @unique
+  advanceIssued         Decimal               @db.Decimal(14, 2)
+  approvedSpend         Decimal               @db.Decimal(14, 2)
+  outcome               ReconciliationOutcome
+  appliedInPayrollRunId String?
+  computedAt            DateTime              @default(now())
+
+  assignment ServiceAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@index([outcome, appliedInPayrollRunId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAN & INVESTMENT  (CompanyLoan/EmployeeAdvance each have two
+// non-identical drafts in the doc set: architecture.md §7.10/§7.11's richer
+// field set, and database-schema.md §31's sparser one. Merged here — richer
+// field set kept, database-schema.md's specific resolved values applied on
+// top. See docs/HANDOFF.md for this reconciliation decision.)
+// ═══════════════════════════════════════════════════════════════
+
+enum LoanStatus {
+  ACTIVE
+  CLOSED
+  DEFAULTED
+}
+
+model CompanyLoan {
+  id                 String     @id @default(cuid())
+  lenderName         String
+  loanType           String     // TERM_LOAN | OVERDRAFT | LEASE
+  principalAmount    Decimal    @db.Decimal(14, 2)
+  // Resolved (Phase 0, prd.md §14): neither uniformly interest-bearing nor
+  // uniformly interest-free — decided per loan. Null/0 = interest-free for
+  // this specific loan; replaces both architecture.md §7.10's required
+  // `interestRate` and database-schema.md §31's `interestBearing Boolean`.
+  interestRate       Decimal?   @db.Decimal(5, 2)
+  tenureMonths       Int
+  disbursementDate   DateTime
+  status             LoanStatus @default(ACTIVE)
+  outstandingBalance Decimal    @db.Decimal(14, 2)
+  branchId           String?
+  createdAt          DateTime   @default(now())
+
+  branch     Branch?                 @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  repayments LoanRepaymentSchedule[]
+
+  @@index([status])
+}
+
+model LoanRepaymentSchedule {
+  id            String    @id @default(cuid())
+  loanId        String
+  installmentNo Int
+  dueDate       DateTime  @db.Date
+  principalDue  Decimal   @db.Decimal(14, 2)
+  interestDue   Decimal   @db.Decimal(14, 2) @default(0) // 0 for an interest-free loan
+  paidAmount    Decimal   @db.Decimal(14, 2) @default(0)
+  paidDate      DateTime?
+  status        String    @default("PENDING") // PENDING | PAID | OVERDUE
+
+  loan CompanyLoan @relation(fields: [loanId], references: [id], onDelete: Restrict)
+
+  @@index([loanId, dueDate])
+}
+
+model Investment {
+  id                   String    @id @default(cuid())
+  investorName         String
+  investmentType       String    // EQUITY | DEBT | GRANT
+  amount               Decimal   @db.Decimal(14, 2)
+  equityPercentage     Decimal?  @db.Decimal(5, 2)
+  interestOrReturnRate Decimal?  @db.Decimal(5, 2)
+  receivedDate         DateTime  @default(now())
+  withdrawnAt          DateTime?
+  termsNote            String?   // "custom/flexible" per prd.md's confirmed decision — free text, not a rigid formula field
+  status               String    @default("ACTIVE")
+  createdAt            DateTime  @default(now())
+
+  @@index([receivedDate])
+}
+
+model EmployeeAdvance {
+  id                 String   @id @default(cuid())
+  employeeId         String
+  amount             Decimal  @db.Decimal(14, 2)
+  reason             String?
+  // Resolved: employee advances are interest-free (prd.md §14) — the one
+  // table where the resolved value IS the default, per database-schema.md §31.
+  interestBearing    Boolean  @default(false)
+  requestedAt        DateTime @default(now())
+  approvalId         String?  // routed via ApprovalRequest, approvalType = EXPENSE (closest existing ApprovalType — see database-schema.md §33's enum)
+  disbursedAt        DateTime?
+  repaymentPlan      String   // SINGLE_DEDUCTION | INSTALLMENTS
+  outstandingBalance Decimal  @db.Decimal(14, 2)
+  status             LoanStatus @default(ACTIVE)
+
+  employee     Employee                  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  installments EmployeeLoanInstallment[]
+
+  @@index([employeeId])
+}
+
+model EmployeeLoanInstallment {
+  id                     String    @id @default(cuid())
+  employeeAdvanceId      String
+  amount                 Decimal   @db.Decimal(14, 2)
+  deductedInPayrollRunId String?
+  dueDate                DateTime  @db.Date
+  deductedAmount         Decimal   @db.Decimal(14, 2) @default(0)
+  status                 String    @default("PENDING") // PENDING | PAID
+
+  employeeAdvance    EmployeeAdvance @relation(fields: [employeeAdvanceId], references: [id], onDelete: Restrict)
+  deductedInPayrollRun PayrollRun?   @relation(fields: [deductedInPayrollRunId], references: [id], onDelete: SetNull)
+
+  @@index([employeeAdvanceId, dueDate])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APPROVAL & GOVERNANCE  (database-schema.md §33, full)
+// ═══════════════════════════════════════════════════════════════
+
+enum ApprovalType {
+  EDIT_REQUEST
+  DELETE_REQUEST
+  CONVEYANCE_BILL
+  STOCK_ADJUSTMENT
+  PURCHASE_REQUEST
+  LEAVE_REQUEST
+  EXPENSE
+  GRN_DISCREPANCY
+  PURCHASE_RETURN
+}
+// GRN_DISCREPANCY / PURCHASE_RETURN added in Phase 4 (this session) —
+// prd.md §9.7/§9.9 both describe a distinct approval flow neither of the
+// original seven values covers; see shared/approval/approval.service.ts's
+// own comment on why these were added here rather than reusing an
+// existing type.
+
+model ApprovalRequest {
+  id            String         @id @default(cuid())
+  approvalType  ApprovalType
+  entityType    String
+  entityId      String
+  requestedById String
+  // Resolved (Phase 0, prd.md §14 "Edit/Delete approver"): when requestedBy
+  // resolves to a Super Admin, this row is created with status = APPROVED
+  // and approvedById left null immediately (no role sits above Super Admin
+  // to serve as an independent approver) — satisfies the no_self_approval
+  // CHECK below trivially, since NULL never equals requestedById. Every
+  // other role's request still needs a real approvedById.
+  approvedById  String?
+  status        ApprovalStatus @default(PENDING)
+  reason        String
+  beforeJson    Json?
+  afterJson     Json?
+  createdAt     DateTime       @default(now())
+  resolvedAt    DateTime?
+
+  requestedBy User  @relation("Requester", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy  User? @relation("Approver", fields: [approvedById], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([status, approvalType])
+  // @@check(constraint: "\"requestedById\" != \"approvedById\"", name: "no_self_approval") (enforced at DB level)
+}
+// RecordChangeRequest (architecture.md §7.21) is the same shape as
+// ApprovalRequest filtered to approvalType IN (EDIT_REQUEST, DELETE_REQUEST)
+// — not modeled as a second table (database-schema.md §33's own rule).
+
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATION & COMMUNICATION  (database-schema.md §34, full)
+// ═══════════════════════════════════════════════════════════════
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  recipientId String
+  channel     NotificationChannel
+  templateKey String
+  payload     Json
+  sentAt      DateTime?
+  readAt      DateTime?
+  createdAt   DateTime            @default(now())
+
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  // Retention: 180 days then purged (database.md §21).
+  @@index([recipientId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DOCUMENT & ATTACHMENT  (database-schema.md §35, full)
+// ═══════════════════════════════════════════════════════════════
+
+model Document {
+  id           String   @id @default(cuid())
+  entityType   String   // polymorphic owner — a receipt, signature file, NID scan, export output
+  entityId     String
+  s3Key        String   @unique // <branchId>/<context>/<entityType>/<entityId>/<filename>, architecture.md §48
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+
+  exportJobs ExportJob[]
+
+  @@index([entityType, entityId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAFT & WORKSPACE  (architecture.md §7.15, full)
+// ═══════════════════════════════════════════════════════════════
+
+model DraftState {
+  id           String   @id @default(cuid())
+  userId       String
+  moduleKey    String   // e.g. "SALES_ORDER_FORM", "PURCHASE_GRN_FORM"
+  recordId     String?  // null when creating a brand-new record
+  formDataJson Json
+  isDirty      Boolean  @default(true)
+  lastSavedAt  DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, moduleKey, recordId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CROSS-CUTTING — named in database.md §2's platform/cross-cutting row and
+// architecture.md §7.16/§18/§66 but never given field-level detail anywhere
+// in the doc set. Built here from each one's own narrative description; not
+// invented beyond what those sections actually say each entity must hold.
+// ═══════════════════════════════════════════════════════════════
+
+// "a user can save a frequently-used search+filter combination... and
+// reopen it in one click" — architecture.md §18.
+model SavedFilter {
+  id         String   @id @default(cuid())
+  userId     String
+  moduleKey  String   // which module's list screen this applies to
+  name       String   // user-given label, e.g. "Overdue loan installments, this branch"
+  filterJson Json
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, moduleKey, name])
+  @@index([userId, moduleKey])
+}
+
+// Backs the Universal Print & Letterhead Toggle Engine and CSV/PDF/DOCX/XML
+// export queue (Accounting_and_Finance_Full_Specification.md §49, §66) —
+// heavy exports are queued via BullMQ (architecture.md §46), not generated
+// synchronously; this is the job's status row.
+model ExportJob {
+  id           String    @id @default(cuid())
+  requestedById String
+  entityType   String    // what's being exported — polymorphic, same §10 pattern
+  entityId     String?   // null for a list/report export not tied to one record
+  format       String    // CSV | PDF | DOCX | XML
+  status       String    @default("QUEUED") // QUEUED | PROCESSING | READY | FAILED
+  resultDocumentId String?
+  requestedAt  DateTime  @default(now())
+  completedAt  DateTime?
+
+  resultDocument Document? @relation(fields: [resultDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([requestedById, status])
+}
+
+// Per-user default for the Print + Letterhead Toggle
+// (Accounting_and_Finance_Full_Specification.md §66.1) — "include letterhead
+// by default" is still an open Y/N (prd.md §14); this table is what makes
+// it a per-user data row rather than a hardcoded default either way resolves to.
+model PrintPreference {
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  includeLetterheadByDefault Boolean @default(true)
+
+  @@index([userId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUDIT & HISTORY  (database.md §12, full)
+// ═══════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String   // "JournalEntry", "User", "ServiceAssignment", ...
+  entityId   String
+  action     String   // CREATE | UPDATE | DELETE | LOGIN_FAILED | PERMISSION_DENIED | ROLE_CHANGED
+  actorId    String?  // null for system/job-initiated actions
+  beforeJson Json?
+  afterJson  Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  // No onDelete relations pointing away from this table at all, not even
+  // Restrict — an audit row must outlive the entity it describes.
+  // entityId/actorId are plain strings, not FKs, by design (database.md §12).
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SYSTEM CONFIGURATION  (database-schema.md §39, full)
+// ═══════════════════════════════════════════════════════════════
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique // "letterhead.default", "fiscal.yearConvention" (resolved: CALENDAR_YEAR), "rateLimit.tier.publicApi"
+  value       String   // stored as text, parsed to the expected type at the Application layer
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedById String
+
+  @@index([key])
+}
+
+model FeatureFlag {
+  id        String  @id @default(cuid())
+  key       String  @unique
+  isEnabled Boolean @default(false)
+  branchId  String? // null = platform-wide; set = branch-specific rollout
+
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INTEGRATION  (database-schema.md §40, full — the four external systems
+// dfd.md §5 names)
+// ═══════════════════════════════════════════════════════════════
+
+model PaymentGatewayTransaction {
+  id                    String   @id @default(cuid())
+  gatewayTransactionId  String   @unique
+  invoiceId             String
+  amount                Decimal  @db.Decimal(14, 2)
+  status                String   // INITIATED | SUCCESS | FAILED | TIMEOUT
+  rawResponseJson       Json?
+  createdAt             DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@index([status])
+}
+
+model SmsLog {
+  id          String    @id @default(cuid())
+  recipient   String
+  templateKey String
+  status      String    // QUEUED | SENT | DELIVERED | FAILED
+  sentAt      DateTime?
+
+  @@index([status])
+}
+
+model EmailLog {
+  id          String    @id @default(cuid())
+  recipient   String
+  templateKey String
+  status      String
+  sentAt      DateTime?
+
+  @@index([status])
+}
+
+model MapsGeocodeCache {
+  id          String   @id @default(cuid())
+  addressHash String   @unique
+  latitude    Decimal  @db.Decimal(9, 6)
+  longitude   Decimal  @db.Decimal(9, 6)
+  cachedAt    DateTime @default(now())
+}

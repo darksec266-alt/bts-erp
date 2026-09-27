@@ -1,0 +1,59 @@
+# Production compose file — mirrors
+# docs/production_postgresql_pgadmin_prisma_secure_setup.md §7 exactly:
+# Postgres/Redis have no published host ports (private-network is `internal:
+# true`, so they are unreachable from outside Docker entirely, not just
+# "not published" — see that document's explicit warning against
+# `ports: ["5432:5432"]`), a worker service is added for BullMQ (Phase 15),
+# and TLS termination happens in Nginx (infra/nginx/conf.d, cert paths
+# provisioned separately per that doc §4).
+#
+# Deploy with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# (base file's dev-only port publishes for postgres/redis/web/api are
+# overridden away by this file — see the `ports: []` overrides below.)
+
+services:
+  postgres:
+    ports: [] # overrides base file's dev convenience — see file header
+    env_file:
+      - .env.production
+
+  redis:
+    ports: [] # overrides base file's dev convenience — see file header
+
+  api:
+    ports: [] # only reachable via nginx in production
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+
+  web:
+    ports: [] # only reachable via nginx in production
+    environment:
+      NODE_ENV: production
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./infra/docker/worker.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - private-network
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
+
+networks:
+  private-network:
+    internal: true # unreachable from outside Docker at all in production — dev's base file omits this

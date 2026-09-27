@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-typecheck-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  # Test job is a skeleton — Section 387's Test Completion Matrix
+  # (unit/integration/API-contract/etc.) is empty until Phase 2 starts
+  # producing real tests. `npm run test` currently passes trivially since
+  # no test files exist yet; this job exists so CI already fails loudly the
+  # moment a test is added and breaks, rather than being wired up later.
+  test:
+    runs-on: ubuntu-latest
+    needs: lint-typecheck-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run tests
+        run: npm run test
