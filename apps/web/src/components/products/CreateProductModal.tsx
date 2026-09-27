@@ -1,7 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Package, Check, AlertCircle, Loader2 } from "lucide-react";
+import {
+  Package,
+  Check,
+  AlertCircle,
+  Loader2,
+  ShieldCheck,
+  Percent,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { api } from "../../lib/api";
 import type {
   ProductDto,
@@ -46,6 +56,24 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
   const [modelNumber, setModelNumber] = useState("");
   const [barcode, setBarcode] = useState("");
 
+  // Authorized Enhancements: Inventory & Sales Controls (Section 12)
+  const [trackStock, setTrackStock] = useState(true);
+  const [allowSale, setAllowSale] = useState(true);
+  const [allowPurchase, setAllowPurchase] = useState(true);
+  const [allowDiscount, setAllowDiscount] = useState(true);
+
+  // Authorized Enhancements: Warranty Configuration (Section 13)
+  const [enableWarranty, setEnableWarranty] = useState(false);
+  const [warrantyMonths, setWarrantyMonths] = useState("12");
+  const [warrantyType, setWarrantyType] = useState<"MANUFACTURER" | "SELLER" | "SERVICE" | "EXTENDED">("MANUFACTURER");
+  const [warrantyCoverage, setWarrantyCoverage] = useState("Full parts & labor coverage");
+  const [warrantyTerms, setWarrantyTerms] = useState("Active from date of customer invoice. Excludes physical/water damage.");
+
+  // Authorized Enhancements: VAT Configuration (Section 19)
+  const [vatApplicable, setVatApplicable] = useState(true);
+  const [vatRatePercent, setVatRatePercent] = useState("15");
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +92,15 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       setTrackingType("NON_SERIALIZED");
       setModelNumber("");
       setBarcode("");
+      setTrackStock(true);
+      setAllowSale(true);
+      setAllowPurchase(true);
+      setAllowDiscount(true);
+      setEnableWarranty(false);
+      setWarrantyMonths("12");
+      setWarrantyType("MANUFACTURER");
+      setVatApplicable(true);
+      setVatRatePercent("15");
       setError(null);
     }
   }, [isOpen, categories, brands, units]);
@@ -100,7 +137,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         costPrice: String(costPrice),
         sellingPrice: String(sellingPrice),
         isServiceItem,
-        trackingType,
+        trackingType: isServiceItem ? "NON_SERIALIZED" : trackingType,
         modelNumber: modelNumber.trim() || undefined,
         barcode: barcode.trim() || undefined,
       });
@@ -158,142 +195,73 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
           />
         </div>
 
-        {/* Body Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
           {error && (
-            <div className="p-3 rounded-sm bg-danger-tint border border-danger/20 text-danger text-body flex items-center gap-2">
+            <div className="flex items-center gap-2 p-3 text-body bg-danger-tint text-danger rounded-sm border border-danger/20">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
+          {/* SKU & Barcode */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-caption font-semibold text-ink mb-1">
-                SKU / Item Code <span className="text-danger">*</span>
+                Item SKU <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
-                className="w-full px-3 py-2 text-body font-mono rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none uppercase"
-                placeholder="e.g. CAM-DOME-2MP"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-caption font-semibold text-ink mb-1">
-                Item Name <span className="text-danger">*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
-                placeholder="e.g. 2MP Dome HD Camera"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Inventory Tracking Type */}
-          <div className="p-3 bg-page-bg/60 rounded-md border border-border space-y-2">
-            <label className="block text-caption font-semibold text-ink">
-              Inventory Tracking Type <span className="text-danger">*</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label
-                className={`flex items-start gap-2.5 p-2.5 rounded-sm border cursor-pointer transition-colors ${
-                  trackingType === "NON_SERIALIZED"
-                    ? "border-primary bg-primary-tint/30 text-ink"
-                    : "border-border bg-surface text-text-muted hover:border-border-strong"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="trackingType"
-                  value="NON_SERIALIZED"
-                  checked={trackingType === "NON_SERIALIZED"}
-                  onChange={() => setTrackingType("NON_SERIALIZED")}
-                  className="mt-0.5 accent-primary"
-                />
-                <div>
-                  <div className="text-body font-semibold text-ink">Non-Serialized / Bulk Product</div>
-                  <div className="text-caption text-text-muted">
-                    Tracked by quantity only (e.g. BNC Connectors, RJ45, DC Pins, Cables, Adapters).
-                  </div>
-                </div>
-              </label>
-
-              <label
-                className={`flex items-start gap-2.5 p-2.5 rounded-sm border cursor-pointer transition-colors ${
-                  trackingType === "SERIALIZED"
-                    ? "border-primary bg-primary-tint/30 text-ink"
-                    : "border-border bg-surface text-text-muted hover:border-border-strong"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="trackingType"
-                  value="SERIALIZED"
-                  checked={trackingType === "SERIALIZED"}
-                  onChange={() => setTrackingType("SERIALIZED")}
-                  className="mt-0.5 accent-primary"
-                />
-                <div>
-                  <div className="text-body font-semibold text-ink">Serialized Unit Product</div>
-                  <div className="text-caption text-text-muted">
-                    Tracked by unique serial & barcode per physical unit (e.g. CCTV Cameras, NVR, DVR, Hard Disks).
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-caption font-semibold text-ink mb-1">
-                Model Number {trackingType === "SERIALIZED" && <span className="text-primary text-xs">(Recommended)</span>}
-              </label>
-              <input
-                type="text"
-                value={modelNumber}
-                onChange={(e) => setModelNumber(e.target.value)}
                 className="w-full px-3 py-2 text-body font-mono rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
-                placeholder="e.g. DS-2CD2043G2-I"
+                placeholder="SKU-2026-XXXX"
+                required
               />
             </div>
 
             <div>
               <label className="block text-caption font-semibold text-ink mb-1">
-                Product Model Barcode / EAN
+                Barcode / EAN
               </label>
               <input
                 type="text"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 className="w-full px-3 py-2 text-body font-mono rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
-                placeholder="e.g. 6941264019283"
+                placeholder="Scan or enter barcode"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Product Name */}
+          <div>
+            <label className="block text-caption font-semibold text-ink mb-1">
+              Product Name <span className="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
+              placeholder="e.g. Cisco Catalyst 2960 Switch 24-Port"
+              required
+            />
+          </div>
+
+          {/* Category & Subcategory */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-caption font-semibold text-ink mb-1">
-                Category
-              </label>
+              <label className="block text-caption font-semibold text-ink mb-1">Category</label>
               <select
                 value={categoryId}
                 onChange={(e) => {
-                  const newCatId = e.target.value;
-                  setCategoryId(newCatId);
+                  setCategoryId(e.target.value);
                   setSubCategoryId("");
                 }}
                 className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none cursor-pointer"
               >
-                <option value="">(No Category)</option>
+                <option value="">Select Category</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -303,22 +271,14 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-caption font-semibold text-ink mb-1">
-                Sub-Category
-              </label>
+              <label className="block text-caption font-semibold text-ink mb-1">Subcategory</label>
               <select
                 value={subCategoryId}
                 onChange={(e) => setSubCategoryId(e.target.value)}
-                disabled={!categoryId}
+                disabled={!categoryId || availableSubCategories.length === 0}
                 className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none cursor-pointer disabled:opacity-50"
               >
-                <option value="">
-                  {categoryId
-                    ? availableSubCategories.length > 0
-                      ? "(Select Sub-Category)"
-                      : "(No Sub-Categories for this Category)"
-                    : "(Select Category First)"}
-                </option>
+                <option value="">Select Subcategory</option>
                 {availableSubCategories.map((sc) => (
                   <option key={sc.id} value={sc.id}>
                     {sc.name}
@@ -326,17 +286,18 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 ))}
               </select>
             </div>
+          </div>
 
+          {/* Brand, Unit & Model */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-caption font-semibold text-ink mb-1">
-                Brand
-              </label>
+              <label className="block text-caption font-semibold text-ink mb-1">Brand</label>
               <select
                 value={brandId}
                 onChange={(e) => setBrandId(e.target.value)}
                 className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none cursor-pointer"
               >
-                <option value="">(No Brand)</option>
+                <option value="">Select Brand</option>
                 {brands.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
@@ -346,15 +307,13 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-caption font-semibold text-ink mb-1">
-                Unit of Measure
-              </label>
+              <label className="block text-caption font-semibold text-ink mb-1">Unit of Measure</label>
               <select
                 value={unitId}
                 onChange={(e) => setUnitId(e.target.value)}
                 className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none cursor-pointer"
               >
-                <option value="">(Default: PCS)</option>
+                <option value="">Select Unit</option>
                 {units.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name} ({u.code})
@@ -362,8 +321,20 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 ))}
               </select>
             </div>
+
+            <div>
+              <label className="block text-caption font-semibold text-ink mb-1">Model / Spec</label>
+              <input
+                type="text"
+                value={modelNumber}
+                onChange={(e) => setModelNumber(e.target.value)}
+                className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
+                placeholder="e.g. WS-C2960-24TT-L"
+              />
+            </div>
           </div>
 
+          {/* Pricing */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-caption font-semibold text-ink mb-1">
@@ -396,6 +367,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             </div>
           </div>
 
+          {/* Service Item Toggle */}
           <div className="p-3 rounded-sm bg-page-bg border border-border flex items-center justify-between">
             <div>
               <p className="text-body font-semibold text-ink">Service Item (No Physical Stock)</p>
@@ -412,6 +384,196 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
               />
               <div className="w-10 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
             </label>
+          </div>
+
+          {/* Advanced Warranty & VAT Options Toggle */}
+          <div className="border border-border rounded-sm overflow-hidden bg-surface">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full px-4 py-2.5 flex items-center justify-between text-[13px] font-medium text-ink bg-page-bg/30 hover:bg-page-bg/60 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-primary" /> Warranty, VAT & Operational Controls (Optional)
+              </span>
+              {showAdvanced ? (
+                <ChevronUp className="w-4 h-4 text-text-muted" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-text-muted" />
+              )}
+            </button>
+
+            {showAdvanced && (
+              <div className="p-4 space-y-4 border-t border-border bg-surface">
+                {/* Tracking & Inventory Controls */}
+                {!isServiceItem && (
+                  <div className="space-y-2">
+                    <p className="text-[12px] font-semibold text-ink uppercase tracking-wider">
+                      Inventory & Lifecycle Controls
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-[12px]">
+                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded-sm border border-border/50 hover:bg-page-bg/50">
+                        <input
+                          type="checkbox"
+                          checked={trackingType === "SERIALIZED"}
+                          onChange={(e) => setTrackingType(e.target.checked ? "SERIALIZED" : "NON_SERIALIZED")}
+                          className="rounded border-border text-primary cursor-pointer"
+                        />
+                        <span className="text-ink">Serialized (Track Unit Serials)</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded-sm border border-border/50 hover:bg-page-bg/50">
+                        <input
+                          type="checkbox"
+                          checked={trackStock}
+                          onChange={(e) => setTrackStock(e.target.checked)}
+                          className="rounded border-border text-primary cursor-pointer"
+                        />
+                        <span className="text-ink">Track Stock Balance</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded-sm border border-border/50 hover:bg-page-bg/50">
+                        <input
+                          type="checkbox"
+                          checked={allowSale}
+                          onChange={(e) => setAllowSale(e.target.checked)}
+                          className="rounded border-border text-primary cursor-pointer"
+                        />
+                        <span className="text-ink">Allow for Sale</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded-sm border border-border/50 hover:bg-page-bg/50">
+                        <input
+                          type="checkbox"
+                          checked={allowDiscount}
+                          onChange={(e) => setAllowDiscount(e.target.checked)}
+                          className="rounded border-border text-primary cursor-pointer"
+                        />
+                        <span className="text-ink">Allow Discounts</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Warranty Configuration (Section 13) */}
+                <div className="p-3 rounded-sm border border-border/70 bg-page-bg/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[13px] font-semibold text-ink block">Warranty Configuration</span>
+                      <span className="text-[11px] text-text-muted block">
+                        Enable warranty coverage and claim eligibility for sold units.
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={enableWarranty}
+                        onChange={(e) => setEnableWarranty(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  {enableWarranty && (
+                    <div className="space-y-3 pt-3 border-t border-border">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-text-muted mb-1">
+                            Warranty Period (Months)
+                          </label>
+                          <select
+                            value={warrantyMonths}
+                            onChange={(e) => setWarrantyMonths(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-surface text-ink outline-none cursor-pointer"
+                          >
+                            <option value="6">6 Months</option>
+                            <option value="12">12 Months (1 Year)</option>
+                            <option value="24">24 Months (2 Years)</option>
+                            <option value="36">36 Months (3 Years)</option>
+                            <option value="60">60 Months (5 Years)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-text-muted mb-1">
+                            Warranty Type
+                          </label>
+                          <select
+                            value={warrantyType}
+                            onChange={(e) => setWarrantyType(e.target.value as any)}
+                            className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-surface text-ink outline-none cursor-pointer"
+                          >
+                            <option value="MANUFACTURER">Manufacturer Warranty</option>
+                            <option value="SELLER">Seller Warranty</option>
+                            <option value="SERVICE">Service & Labor Only</option>
+                            <option value="EXTENDED">Extended Warranty</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-text-muted mb-1">
+                          Coverage Scope
+                        </label>
+                        <input
+                          type="text"
+                          value={warrantyCoverage}
+                          onChange={(e) => setWarrantyCoverage(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-surface text-ink outline-none"
+                          placeholder="e.g. Free parts replacement & bench repair"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* VAT Configuration (Section 19) */}
+                <div className="p-3 rounded-sm border border-border/70 bg-page-bg/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[13px] font-semibold text-ink block">VAT / Tax Treatment</span>
+                      <span className="text-[11px] text-text-muted block">
+                        NBR standard VAT rate applicable to this SKU.
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={vatApplicable}
+                        onChange={(e) => setVatApplicable(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  {vatApplicable && (
+                    <div className="pt-2 border-t border-border flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className="block text-[11px] font-medium text-text-muted mb-1">
+                          Standard VAT Rate (%)
+                        </label>
+                        <select
+                          value={vatRatePercent}
+                          onChange={(e) => setVatRatePercent(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-surface text-ink outline-none cursor-pointer"
+                        >
+                          <option value="0">0% (Exempt)</option>
+                          <option value="5">5% (Truncated Rate)</option>
+                          <option value="7.5">7.5% (Intermediate Rate)</option>
+                          <option value="10">10% (Reduced Rate)</option>
+                          <option value="15">15% (Standard NBR Rate)</option>
+                        </select>
+                      </div>
+                      <div className="text-[11px] text-text-muted pt-4">
+                        Invoices retain transaction-specific VAT treatment.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Actions */}

@@ -239,110 +239,60 @@ export const InventoryModule: React.FC = () => {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Stock Units</p>
-          <p className="text-h2 font-bold text-ink mt-1 tabular-nums">{stats.totalItemsInStock.toLocaleString()}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">In warehouse</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Stock Units</p>
+            <p className="text-h2 font-bold text-ink mt-1 tabular-nums">{stats.totalItemsInStock.toLocaleString()}</p>
+            <p className="text-[11px] text-text-muted mt-0.5">In warehouse</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+            <Package className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Valuation</p>
-          <p className="text-h2 font-bold text-ink mt-1 tabular-nums">৳{stats.totalValuation.toLocaleString()}</p>
-          <p className="text-[11px] text-success font-medium mt-0.5">At cost price</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Valuation</p>
+            <p className="text-h2 font-bold text-ink mt-1 tabular-nums">৳{stats.totalValuation.toLocaleString()}</p>
+            <p className="text-[11px] text-success font-medium mt-0.5">At cost price</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+            <DollarSign className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Low Stock</p>
-          <p className="text-h2 font-bold text-danger mt-1 tabular-nums">{stats.lowStockItemsCount}</p>
-          <p className="text-[11px] text-danger font-medium mt-0.5">Need replenishment</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Low Stock</p>
+            <p className="text-h2 font-bold text-danger mt-1 tabular-nums">{stats.lowStockItemsCount}</p>
+            <p className="text-[11px] text-danger font-medium mt-0.5">Need replenishment</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-danger/10 text-danger flex items-center justify-center shrink-0">
+            <AlertCircle className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Transfers</p>
-          <p className="text-h2 font-bold text-ink mt-1 tabular-nums">{stats.activeTransfersCount}</p>
-          <p className="text-[11px] text-primary font-medium mt-0.5">In transit</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Transfers</p>
+            <p className="text-h2 font-bold text-ink mt-1 tabular-nums">{stats.activeTransfersCount}</p>
+            <p className="text-[11px] text-primary font-medium mt-0.5">In transit</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <ArrowLeftRight className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Loss Reports</p>
-          <p className="text-h2 font-bold text-warning mt-1 tabular-nums">{stats.damageLossReportsCount}</p>
-          <p className="text-[11px] text-warning font-medium mt-0.5">Pending review</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Loss Reports</p>
+            <p className="text-h2 font-bold text-warning mt-1 tabular-nums">{stats.damageLossReportsCount}</p>
+            <p className="text-[11px] text-warning font-medium mt-0.5">Pending review</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
         </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="flex border-b border-border bg-surface px-3 rounded-t-sm overflow-x-auto">
-        <button
-          onClick={() => handleTabChange("balances")}
-          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === "balances"
-              ? "border-primary text-primary"
-              : "border-transparent text-text-muted hover:text-ink"
-          }`}
-        >
-          <Warehouse className="w-3.5 h-3.5" />
-          <span>Balances</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-            {stockList.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange("transfers")}
-          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === "transfers"
-              ? "border-primary text-primary"
-              : "border-transparent text-text-muted hover:text-ink"
-          }`}
-        >
-          <ArrowLeftRight className="w-3.5 h-3.5" />
-          <span>Transfers</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-            {transfers.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange("adjustments")}
-          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === "adjustments"
-              ? "border-primary text-primary"
-              : "border-transparent text-text-muted hover:text-ink"
-          }`}
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>Adjustments</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-            {adjustments.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange("tracking")}
-          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === "tracking"
-              ? "border-primary text-primary"
-              : "border-transparent text-text-muted hover:text-ink"
-          }`}
-        >
-          <QrCode className="w-3.5 h-3.5" />
-          <span>Tracking</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange("damage-loss")}
-          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === "damage-loss"
-              ? "border-primary text-primary"
-              : "border-transparent text-text-muted hover:text-ink"
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          <span>Damage & Loss</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-            {damageReports.length}
-          </span>
-        </button>
       </div>
 
       {/* Filter Toolbar */}

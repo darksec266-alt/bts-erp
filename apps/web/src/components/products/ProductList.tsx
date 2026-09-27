@@ -216,30 +216,42 @@ export const ProductList: React.FC = () => {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total SKUs</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{totalCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Catalog items</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total SKUs</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{totalCount}</p>
+            <p className="text-[11px] text-text-muted mt-0.5">Catalog items</p>
+          </div>
+          <Package className="w-5 h-5 text-primary shrink-0" />
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active</p>
-          <p className="text-h1 font-bold text-success mt-1 tabular-nums">{activeCount}</p>
-          <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Ready for sale
-          </p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active</p>
+            <p className="text-h1 font-bold text-success mt-1 tabular-nums">{activeCount}</p>
+            <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> Ready for sale
+            </p>
+          </div>
+          <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Physical</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{physicalCount}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Stock-tracked</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Physical</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{physicalCount}</p>
+            <p className="text-[11px] text-text-muted mt-0.5">Stock-tracked</p>
+          </div>
+          <Box className="w-5 h-5 text-teal shrink-0" />
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Services</p>
-          <p className="text-h1 font-bold text-warning mt-1 tabular-nums">{serviceCount}</p>
-          <p className="text-[11px] text-warning font-medium mt-0.5">Non-stocked</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Services</p>
+            <p className="text-h1 font-bold text-warning mt-1 tabular-nums">{serviceCount}</p>
+            <p className="text-[11px] text-warning font-medium mt-0.5">Non-stocked</p>
+          </div>
+          <Wrench className="w-5 h-5 text-warning shrink-0" />
         </div>
       </div>
 

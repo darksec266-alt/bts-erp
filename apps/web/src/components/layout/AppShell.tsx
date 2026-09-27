@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Users,
   Package,
@@ -25,6 +25,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
+  BarChart3,
 } from "lucide-react";
 import { api, type AuthUser } from "../../lib/api";
 
@@ -82,21 +83,44 @@ const SidebarNav: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  const searchParams = useSearchParams();
+
   const isLeafActive = (path: string): boolean => {
-    const [base] = path.split("?");
+    const [base, query] = path.split("?");
+    const childParams = new URLSearchParams(query || "");
+    const childTab = childParams.get("tab");
+
     if (activePath) {
       if (activePath === path) return true;
-      if (activePath.startsWith(base + "/") || activePath.startsWith(base + "?")) return true;
+      const [activeBase, activeQuery] = activePath.split("?");
+      if (activeBase !== base) return false;
+      const activeTab = new URLSearchParams(activeQuery || "").get("tab");
+      return (activeTab || null) === (childTab || null);
     }
-    if (pathname === base) return true;
-    if (base !== "/" && pathname.startsWith(base)) return true;
+
+    if (pathname !== base) return false;
+
+    // Both match pathname, now check tab query parameter
+    const currentTab = searchParams ? searchParams.get("tab") : null;
+    if (childTab) {
+      return currentTab === childTab;
+    }
+    // Child has no tab query param: it is active only when no tab is present or tab is the default root tab
+    if (!currentTab) return true;
+    if (base === "/sales" && currentTab === "quotations") return true;
+    if (base === "/procurement" && (currentTab === "requests" || currentTab === "purchase-requests")) return true;
+    if (base === "/inventory" && currentTab === "balances") return true;
+    if (base === "/service" && currentTab === "tickets") return true;
+    if (base === "/master-data" && currentTab === "categories") return true;
+    if (base === "/reports" && currentTab === "vat") return true;
     return false;
   };
 
   const isSectionActive = (item: NavSection): boolean => {
-    if (isLeafActive(item.path)) return true;
-    if (item.children) return item.children.some((c) => isLeafActive(c.path));
-    return false;
+    if (!item.children || item.children.length === 0) {
+      return isLeafActive(item.path);
+    }
+    return item.children.some((c) => isLeafActive(c.path));
   };
 
   const toggleSection = (key: string) => {
@@ -229,6 +253,7 @@ const Breadcrumb: React.FC = () => {
   else if (pathname.startsWith("/service")) segments.push({ label: "Field Service" });
   else if (pathname.startsWith("/products")) segments.push({ label: "Products" });
   else if (pathname.startsWith("/customers")) segments.push({ label: "Customers" });
+  else if (pathname.startsWith("/reports")) segments.push({ label: "Reports" });
   else if (pathname.startsWith("/master-data")) segments.push({ label: "Configuration" });
 
   if (segments.length === 0) return null;
@@ -335,6 +360,23 @@ export const AppShell: React.FC<AppShellProps> = ({
       ],
     },
     {
+      title: "Intelligence & Reports",
+      items: [
+        {
+          label: "Reports",
+          path: "/reports",
+          icon: BarChart3,
+          children: [
+            { label: "Sales VAT Report", path: "/reports" },
+            { label: "Purchase Tax Report", path: "/reports?tab=tax" },
+            { label: "Warranty & Service", path: "/reports?tab=warranty" },
+            { label: "Sales Summary", path: "/reports?tab=sales" },
+            { label: "Purchases Summary", path: "/reports?tab=purchases" },
+          ],
+        },
+      ],
+    },
+    {
       title: "Configuration",
       items: [
         {
@@ -427,12 +469,14 @@ export const AppShell: React.FC<AppShellProps> = ({
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
-          <SidebarNav
-            groups={navGroups}
-            collapsed={collapsed}
-            activePath={activePath}
-            onItemClick={() => setMobileOpen(false)}
-          />
+          <Suspense fallback={<div className="p-4 text-[11px] text-sidebar-text/50">Loading navigation...</div>}>
+            <SidebarNav
+              groups={navGroups}
+              collapsed={collapsed}
+              activePath={activePath}
+              onItemClick={() => setMobileOpen(false)}
+            />
+          </Suspense>
         </div>
 
         {/* User footer */}

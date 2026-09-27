@@ -312,98 +312,63 @@ export const ServiceModule: React.FC<ServiceModuleProps> = ({ selectedBranchId }
 
       {/* High-Level Metric KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        <div className="p-4 rounded-sm bg-surface border border-border shadow-xs">
-          <div className="flex items-center justify-between text-caption text-text-muted mb-1">
-            <span>Open Tickets</span>
-            <Wrench className="w-4 h-4 text-primary" />
+        <div className="p-4 rounded-sm bg-surface border border-border flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Open Tickets</p>
+            <div className="text-h2 font-mono font-bold text-ink mt-1">{stats.openTickets}</div>
+            <div className="text-[11px] text-text-muted mt-0.5">Awaiting resolution</div>
           </div>
-          <div className="text-h2 font-mono font-bold text-ink">{stats.openTickets}</div>
-          <div className="text-[11px] text-text-muted mt-1">Awaiting resolution</div>
+          <div className="w-9 h-9 rounded-sm bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Wrench className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm bg-surface border border-border shadow-xs">
-          <div className="flex items-center justify-between text-caption text-text-muted mb-1">
-            <span>Active Assignments</span>
-            <Calendar className="w-4 h-4 text-accent" />
+        <div className="p-4 rounded-sm bg-surface border border-border flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active Assignments</p>
+            <div className="text-h2 font-mono font-bold text-ink mt-1">{stats.activeAssignments}</div>
+            <div className="text-[11px] text-text-muted mt-0.5">Fieldwork scheduled</div>
           </div>
-          <div className="text-h2 font-mono font-bold text-ink">{stats.activeAssignments}</div>
-          <div className="text-[11px] text-text-muted mt-1">Fieldwork scheduled</div>
+          <div className="w-9 h-9 rounded-sm bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+            <Calendar className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm bg-surface border border-border shadow-xs">
-          <div className="flex items-center justify-between text-caption text-text-muted mb-1">
-            <span>Custody In Field</span>
-            <PackageCheck className="w-4 h-4 text-warning" />
+        <div className="p-4 rounded-sm bg-surface border border-border flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Custody In Field</p>
+            <div className="text-h2 font-mono font-bold text-ink mt-1">{custodyItems.filter(c => c.status === "ASSIGNED").length}</div>
+            <div className="text-[11px] text-text-muted mt-0.5">Equipment with tech</div>
           </div>
-          <div className="text-h2 font-mono font-bold text-ink">{custodyItems.filter(c => c.status === "ASSIGNED").length}</div>
-          <div className="text-[11px] text-text-muted mt-1">Equipment with tech</div>
+          <div className="w-9 h-9 rounded-sm bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+            <PackageCheck className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm bg-surface border border-border shadow-xs">
-          <div className="flex items-center justify-between text-caption text-text-muted mb-1">
-            <span>Pending Conveyance</span>
-            <Receipt className="w-4 h-4 text-danger" />
+        <div className="p-4 rounded-sm bg-surface border border-border flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Pending Conveyance</p>
+            <div className="text-h2 font-mono font-bold text-ink mt-1">{stats.pendingConveyanceBills}</div>
+            <div className="text-[11px] text-text-muted mt-0.5">Four-eyes approval req.</div>
           </div>
-          <div className="text-h2 font-mono font-bold text-ink">{stats.pendingConveyanceBills}</div>
-          <div className="text-[11px] text-text-muted mt-1">Four-eyes approval req.</div>
+          <div className="w-9 h-9 rounded-sm bg-danger/10 text-danger flex items-center justify-center shrink-0">
+            <Receipt className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm bg-surface border border-border shadow-xs">
-          <div className="flex items-center justify-between text-caption text-text-muted mb-1">
-            <span>Active Warranties</span>
-            <ShieldCheck className="w-4 h-4 text-success" />
+        <div className="p-4 rounded-sm bg-surface border border-border flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active Warranties</p>
+            <div className="text-h2 font-mono font-bold text-ink mt-1">{stats.activeWarranties}</div>
+            <div className="text-[11px] text-text-muted mt-0.5">Serialized coverage</div>
           </div>
-          <div className="text-h2 font-mono font-bold text-ink">{stats.activeWarranties}</div>
-          <div className="text-[11px] text-text-muted mt-1">Serialized coverage</div>
+          <div className="w-9 h-9 rounded-sm bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="border-b border-border flex items-center gap-1 overflow-x-auto bg-surface px-3 rounded-t-sm">
-        {[
-          { id: "tickets", label: "Tickets", count: tickets.length, icon: Wrench },
-          { id: "assignments", label: "Assignments", count: assignments.length, icon: Calendar },
-          { id: "custody", label: "Custody", count: custodyItems.length, icon: PackageCheck },
-          { id: "visits", label: "Site Visits", count: locationLogs.length, icon: MapPin },
-          { id: "finances", label: "Finances", count: advances.length + conveyanceBills.length, icon: DollarSign },
-          { id: "warranties", label: "Warranties", count: warranties.length, icon: ShieldCheck },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() =>
-                setActiveTab(
-                  tab.id as
-                    | "tickets"
-                    | "assignments"
-                    | "custody"
-                    | "visits"
-                    | "finances"
-                    | "warranties"
-                )
-              }
-              className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 transition-colors border-b-2 relative whitespace-nowrap ${
-                isActive
-                  ? "border-primary text-primary"
-                  : "border-transparent text-text-muted hover:text-ink"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-              <span
-                className={`text-[11px] px-1.5 py-0.2 rounded-full font-mono ${
-                  isActive ? "bg-primary text-white" : "bg-page-bg text-text-muted"
-                }`}
-              >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+
 
       {/* TAB 1: TICKETS */}
       {activeTab === "tickets" && (

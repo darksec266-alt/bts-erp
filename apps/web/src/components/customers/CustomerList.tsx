@@ -238,30 +238,42 @@ export const CustomerList: React.FC<CustomerListProps> = ({ selectedBranchId }) 
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Clients</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.total}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Registered</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Clients</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.total}</p>
+            <p className="text-[11px] text-text-muted mt-0.5">Registered</p>
+          </div>
+          <Users className="w-5 h-5 text-primary shrink-0" />
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.total > 0 ? stats.active : 0}</p>
-          <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Operational
-          </p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.total > 0 ? stats.active : 0}</p>
+            <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> Operational
+            </p>
+          </div>
+          <UserCheck className="w-5 h-5 text-success shrink-0" />
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Service-Only</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.serviceOnly}</p>
-          <p className="text-[11px] text-teal font-medium mt-0.5">Field Maintenance</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Service-Only</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.serviceOnly}</p>
+            <p className="text-[11px] text-teal font-medium mt-0.5">Field Maintenance</p>
+          </div>
+          <Wrench className="w-5 h-5 text-teal shrink-0" />
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Branches</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{branches.length}</p>
-          <p className="text-[11px] text-purple font-medium mt-0.5">Operating Hubs</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Branches</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{branches.length}</p>
+            <p className="text-[11px] text-purple font-medium mt-0.5">Operating Hubs</p>
+          </div>
+          <Building2 className="w-5 h-5 text-purple shrink-0" />
         </div>
       </div>
 

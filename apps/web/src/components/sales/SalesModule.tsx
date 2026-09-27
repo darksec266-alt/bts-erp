@@ -24,6 +24,7 @@ import {
   PackageCheck,
   RotateCcw,
   Wallet,
+  DollarSign,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import type {
@@ -705,73 +706,59 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
 
       {/* KPI Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Revenue</p>
-          <p className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
-            ৳{stats.totalRevenue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
-          </p>
-          <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" /> Confirmed
-          </p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Revenue</p>
+            <p className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
+              ৳{stats.totalRevenue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" /> Confirmed
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+            <DollarSign className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Orders</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalOrders}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Active</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Orders</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalOrders}</p>
+            <p className="text-[11px] text-text-muted mt-0.5">Active</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+            <ShoppingCart className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Challans</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.dispatchedChallans}</p>
-          <p className="text-[11px] text-warning font-medium mt-0.5">
-            {stats.unbilledChallans !== undefined ? `${stats.unbilledChallans} unbilled` : "Dispatched"}
-          </p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Challans</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.dispatchedChallans}</p>
+            <p className="text-[11px] text-warning font-medium mt-0.5">
+              {stats.unbilledChallans !== undefined ? `${stats.unbilledChallans} unbilled` : "Dispatched"}
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+            <Truck className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Invoices</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalInvoices ?? invoicesTotal}</p>
-          <p className="text-[11px] text-primary font-medium mt-0.5">Commercial</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Invoices</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalInvoices ?? invoicesTotal}</p>
+            <p className="text-[11px] text-primary font-medium mt-0.5">Commercial</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-purple/10 text-purple flex items-center justify-center shrink-0">
+            <FileCheck className="w-5 h-5" />
+          </div>
         </div>
       </div>
 
-      {/* Tab bar + Filters */}
-      <div className="space-y-0">
-        <div className="flex border-b border-border bg-surface px-3 rounded-t-sm overflow-x-auto">
-          {([
-            { key: "quotations", label: "Quotations", icon: FileText, count: quotationsTotal },
-            { key: "orders", label: "Orders", icon: ShoppingCart, count: ordersTotal },
-            { key: "projects", label: "Projects", icon: Briefcase, count: projectsTotal },
-            { key: "challans", label: "Challans", icon: Truck, count: challansTotal },
-            { key: "invoices", label: "Invoices", icon: FileCheck, count: invoicesTotal },
-            { key: "advances", label: "Advances", icon: ArrowDownLeft, count: advancesTotal },
-            { key: "payments", label: "Payments", icon: CreditCard, count: paymentsTotal },
-            { key: "credit-notes", label: "Credit Notes", icon: FileMinus, count: creditNotesTotal },
-            { key: "returns", label: "Returns", icon: Undo2, count: challanReturnsTotal },
-          ] as { key: SalesTab; label: string; icon: React.ComponentType<{className?: string}>; count: number }[]).map(({ key, label, icon: Icon, count }) => (
-            <button
-              key={key}
-              onClick={() => handleTabChange(key)}
-              className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-                activeTab === key
-                  ? "border-primary text-primary"
-                  : "border-transparent text-text-muted hover:text-ink"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-              <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ml-0.5 ${
-                activeTab === key ? "bg-primary/10 text-primary" : "bg-page-bg text-text-muted"
-              }`}>
-                {count}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Filter Controls Bar */}
-        <div className="p-4 rounded-b-md border border-border bg-surface shadow-elevation-1 flex flex-col md:flex-row items-center gap-3">
+      {/* Filter Controls Bar */}
+      <div className="p-4 rounded-md border border-border bg-surface shadow-elevation-1 flex flex-col md:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-text-muted" />
             <input

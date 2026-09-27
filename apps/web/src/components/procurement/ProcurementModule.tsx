@@ -446,113 +446,65 @@ export const ProcurementModule: React.FC = () => {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Spend</p>
-          <p className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
-            ৳{stats.totalSpend.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
-          </p>
-          <p className="text-[11px] text-text-muted mt-0.5">Confirmed POs</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Spend</p>
+            <p className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
+              ৳{stats.totalSpend.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[11px] text-text-muted mt-0.5">Confirmed POs</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+            <DollarSign className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Purchase Orders</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalPOs}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Vendor contracts</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Purchase Orders</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalPOs}</p>
+            <p className="text-[11px] text-text-muted mt-0.5">Vendor contracts</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+            <ShoppingCart className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Requisitions</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.pendingPRs}</p>
-          <p className="text-[11px] mt-0.5">
-            {stats.pendingPRs > 0 ? (
-              <span className="text-warning font-medium">Awaiting approval</span>
-            ) : approvedPendingPoCount > 0 ? (
-              <span className="text-primary font-medium">{approvedPendingPoCount} approved, no PO</span>
-            ) : (
-              <span className="text-success font-medium">All completed</span>
-            )}
-          </p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Requisitions</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.pendingPRs}</p>
+            <p className="text-[11px] mt-0.5">
+              {stats.pendingPRs > 0 ? (
+                <span className="text-warning font-medium">Awaiting approval</span>
+              ) : approvedPendingPoCount > 0 ? (
+                <span className="text-primary font-medium">{approvedPendingPoCount} approved, no PO</span>
+              ) : (
+                <span className="text-success font-medium">All completed</span>
+              )}
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="p-4 rounded-sm border border-border bg-surface">
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active Suppliers</p>
-          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.activeSuppliers}</p>
-          <p className="text-[11px] text-success font-medium mt-0.5">Verified vendors</p>
+        <div className="p-4 rounded-sm border border-border bg-surface flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active Suppliers</p>
+            <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.activeSuppliers}</p>
+            <p className="text-[11px] text-success font-medium mt-0.5">Verified vendors</p>
+          </div>
+          <div className="w-9 h-9 rounded-sm bg-purple/10 text-purple flex items-center justify-center shrink-0">
+            <Truck className="w-5 h-5" />
+          </div>
         </div>
       </div>
 
-      {/* Tabs & Filter Bar */}
+      {/* Filter Bar */}
       <div className="space-y-4">
-        {/* Tab Navigation */}
-        <div className="flex border-b border-border bg-surface px-3 rounded-t-sm overflow-x-auto">
-          <button
-            onClick={() => handleTabChange("suppliers")}
-            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-              activeTab === "suppliers"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <Truck className="w-3.5 h-3.5" />
-            <span>Suppliers</span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-              {suppliers.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("purchase-requests")}
-            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-              activeTab === "purchase-requests"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Requisitions</span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-              {purchaseRequests.length}
-            </span>
-            {stats.pendingPRs > 0 && (
-              <span className="text-[11px] px-1.5 py-0.5 rounded bg-warning-tint text-warning font-semibold">
-                {stats.pendingPRs}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => handleTabChange("purchase-orders")}
-            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-              activeTab === "purchase-orders"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <ShoppingCart className="w-3.5 h-3.5" />
-            <span>Purchase Orders</span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-              {purchaseOrders.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("grn")}
-            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-              activeTab === "grn"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <FileCheck className="w-3.5 h-3.5" />
-            <span>Goods Receipts</span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
-              {grns.length}
-            </span>
-          </button>
-        </div>
-
         {/* Filter Controls Bar */}
-        <div className="p-4 rounded-b-md border border-border bg-surface shadow-elevation-1 flex flex-col md:flex-row items-center gap-3">
+        <div className="p-4 rounded-md border border-border bg-surface shadow-elevation-1 flex flex-col md:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-text-muted" />
             <input

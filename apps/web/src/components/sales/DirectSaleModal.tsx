@@ -15,6 +15,8 @@ import {
   Warehouse,
   Barcode,
   Sparkles,
+  Percent,
+  ShieldCheck,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import type {
@@ -131,8 +133,10 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
     );
   }, [warehouseId, productList]);
 
-  const discountAmount = 0;
-  const taxAmount = 0;
+  // Authorized Sales VAT and discount controls
+  const [vatEnabled, setVatEnabled] = useState(false);
+  const [vatRate, setVatRate] = useState<number>(15);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
 
   // Payment
   const [isPaid, setIsPaid] = useState(true);
@@ -381,7 +385,9 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
     (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
     0
   );
-  const grandTotal = Math.max(0, subtotal - discountAmount + taxAmount);
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const vatAmount = vatEnabled ? Math.round(taxableAmount * (vatRate / 100) * 100) / 100 : 0;
+  const grandTotal = taxableAmount + vatAmount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -723,6 +729,10 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                                   <Barcode className="w-3 h-3" />
                                   SERIALIZED
                                 </span>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-primary-tint text-primary border border-primary/20 rounded text-[10px] font-semibold">
+                                  <ShieldCheck className="w-3 h-3" />
+                                  Warranty Registered
+                                </span>
                                 {line.serials && line.serials.length > 0 && (
                                   <span className="text-[10px] text-text-muted font-medium">
                                     ({line.serials.length} units captured):
@@ -770,7 +780,7 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                               }
                               title={
                                 isLowStock
-          `Available: ${available}, Requested: ${l.quantity}.`
+                                  ? `Available: ${line.availableStock ?? 0}, Requested: ${line.quantity}.`
                                   : `Available in stock: ${line.availableStock ?? 0}`
                               }
                               className={`w-full px-2.5 py-1.5 text-body rounded-sm border bg-page-bg text-ink focus:bg-surface outline-none text-right font-mono transition-colors ${
@@ -879,25 +889,89 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                 )}
               </div>
 
-              {/* Totals */}
-              <div className="space-y-2 text-body">
+              {/* Totals & VAT Breakdown */}
+              <div className="space-y-3 text-body">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <div className="flex items-center gap-1.5 text-caption font-semibold uppercase text-ink">
+                    <Percent className="w-3.5 h-3.5 text-primary" />
+                    <span>Sales VAT</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {vatEnabled && (
+                      <select
+                        value={vatRate}
+                        onChange={(e) => setVatRate(Number(e.target.value))}
+                        className="px-2 py-0.5 text-caption font-semibold rounded-sm border border-border bg-surface text-ink outline-none"
+                      >
+                        <option value={0}>0%</option>
+                        <option value={5}>5%</option>
+                        <option value={7.5}>7.5%</option>
+                        <option value={10}>10%</option>
+                        <option value={15}>15%</option>
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setVatEnabled(!vatEnabled)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        vatEnabled ? "bg-primary" : "bg-border"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          vatEnabled ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-text-muted">
+                  <span>Discount (BDT):</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={discountAmount || ""}
+                    onChange={(e) => setDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
+                    placeholder="0.00"
+                    className="w-28 px-2 py-0.5 text-right font-mono text-body rounded-sm border border-border bg-surface text-ink outline-none focus:border-primary"
+                  />
+                </div>
+
                 <div className="flex justify-between text-text-muted">
                   <span>Subtotal:</span>
                   <span className="font-mono text-ink">
                     BDT {subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-danger">
+                    <span>Discount:</span>
+                    <span className="font-mono">
+                      -BDT {discountAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-text-muted">
-                  <span>Discount:</span>
-                  <span className="font-mono text-ink">BDT 0.00</span>
+                  <span>Taxable Amount:</span>
+                  <span className="font-mono text-ink">
+                    BDT {taxableAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
+
                 <div className="flex justify-between text-text-muted">
-                  <span>VAT / Tax (0%):</span>
-                  <span className="font-mono text-ink">BDT 0.00</span>
+                  <span>Sales VAT ({vatEnabled ? `${vatRate}%` : "0% OFF"}):</span>
+                  <span className="font-mono text-ink">
+                    BDT {vatAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
+
                 <div className="flex justify-between text-h3 font-bold pt-2 border-t border-border">
                   <span className="text-ink">Grand Total:</span>
-                  <span className="font-mono text-primary">
+                  <span className="font-mono text-primary text-xl">
                     BDT {grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>

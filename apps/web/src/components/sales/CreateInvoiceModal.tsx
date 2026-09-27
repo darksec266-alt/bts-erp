@@ -10,6 +10,8 @@ import {
   Layers,
   CheckSquare,
   Square,
+  ShieldCheck,
+  Percent,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import type {
@@ -48,6 +50,11 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Authorized VAT & Tax controls (Section 17, 18, 26)
+  const [vatEnabled, setVatEnabled] = useState(false);
+  const [vatRate, setVatRate] = useState<number>(15);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
 
   // Update order selection when preSelectedOrderId changes or modal opens
   useEffect(() => {
@@ -169,7 +176,10 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   });
 
   const previewItems = Array.from(aggregatedItemsMap.values());
-  const calculatedGrandTotal = previewItems.reduce((acc, curr) => acc + curr.total, 0);
+  const subtotal = previewItems.reduce((acc, curr) => acc + curr.total, 0);
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const vatAmount = vatEnabled ? Math.round(taxableAmount * (vatRate / 100) * 100) / 100 : 0;
+  const calculatedGrandTotal = taxableAmount + vatAmount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,7 +424,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                     {previewItems.map((item, idx) => (
                       <tr key={idx} className="hover:bg-page-bg/30">
                         <td className="py-2 px-3">
-                          <p className="font-semibold text-ink text-body">{item.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-ink text-body">{item.name}</p>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary-tint text-primary border border-primary/20">
+                              <ShieldCheck className="w-3 h-3" />
+                              Warranty Eligible
+                            </span>
+                          </div>
                           <span className="text-[11px] text-text-muted font-mono">
                             SKU: {item.sku}
                           </span>
@@ -434,16 +450,113 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 </table>
               </div>
 
-              {/* Total Calculation Card */}
-              <div className="flex justify-end">
-                <div className="w-72 p-3.5 rounded-sm bg-page-bg border border-border space-y-1.5">
-                  <div className="flex items-center justify-between text-caption text-text-muted">
-                    <span>Challans Consolidated:</span>
-                    <span className="font-mono font-bold text-ink">{selectedChallanIds.length}</span>
+              {/* VAT & Tax Calculation Breakdown Card */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {/* VAT & Discount Controls */}
+                <div className="p-3.5 rounded-sm bg-page-bg/50 border border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-caption font-semibold uppercase tracking-wider text-ink flex items-center gap-1.5">
+                      <Percent className="w-4 h-4 text-primary" />
+                      Apply Sales VAT
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setVatEnabled(!vatEnabled)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        vatEnabled ? "bg-primary" : "bg-border"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          vatEnabled ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
                   </div>
+
+                  {vatEnabled && (
+                    <div className="grid grid-cols-2 gap-2 pt-1 animate-fadeIn">
+                      <div>
+                        <label className="block text-[11px] font-medium text-text-muted mb-1">
+                          VAT Rate (%)
+                        </label>
+                        <select
+                          value={vatRate}
+                          onChange={(e) => setVatRate(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-surface text-ink text-sm outline-none"
+                        >
+                          <option value={0}>0% (Zero-Rated / Exempt)</option>
+                          <option value={5}>5% (Reduced Rate)</option>
+                          <option value={7.5}>7.5% (Standard Service)</option>
+                          <option value={10}>10% (Special Rate)</option>
+                          <option value={15}>15% (Standard VAT)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-text-muted mb-1">
+                          VAT Treatment
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          value="Standard Output VAT"
+                          className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-page-bg text-text-muted text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-text-muted mb-1">
+                      Discount (৳)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={discountAmount || ""}
+                      onChange={(e) => setDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
+                      placeholder="0.00"
+                      className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-surface text-ink text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* Calculation Summary Card */}
+                <div className="p-3.5 rounded-sm bg-page-bg border border-border space-y-2">
+                  <div className="flex items-center justify-between text-body text-text-muted">
+                    <span>Subtotal:</span>
+                    <span className="font-mono font-medium text-ink">
+                      ৳{subtotal.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {discountAmount > 0 && (
+                    <div className="flex items-center justify-between text-body text-danger">
+                      <span>Discount:</span>
+                      <span className="font-mono font-medium">
+                        -৳{discountAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-body text-text-muted">
+                    <span>Taxable Amount:</span>
+                    <span className="font-mono font-medium text-ink">
+                      ৳{taxableAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-body text-text-muted">
+                    <span>Sales VAT ({vatEnabled ? `${vatRate}%` : "0% OFF"}):</span>
+                    <span className="font-mono font-medium text-ink">
+                      ৳{vatAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
                   <div className="border-t border-border pt-2 flex items-center justify-between font-bold text-h3 text-ink">
                     <span>Invoice Grand Total:</span>
-                    <span className="font-mono text-primary">
+                    <span className="font-mono text-primary text-xl">
                       ৳{calculatedGrandTotal.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
