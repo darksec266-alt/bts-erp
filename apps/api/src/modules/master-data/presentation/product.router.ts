@@ -67,7 +67,7 @@ export function createProductRouter(deps: {
           isServiceItem: isServiceItem === "true" ? true : isServiceItem === "false" ? false : undefined,
           search: typeof search === "string" ? search : undefined,
         },
-        { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 100) }
+        { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 500) }
       );
       sendData(res, result);
     } catch (err: unknown) {

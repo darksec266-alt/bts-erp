@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ChevronDown, Check, Package, Sparkles } from "lucide-react";
 import type { ProductDto } from "@bts/shared-types";
+import { api } from "../../lib/api";
 
 export interface ProductSearchSelectProps {
   products: ProductDto[];
@@ -37,16 +38,28 @@ export const ProductSearchSelect: React.FC<ProductSearchSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [extraProducts, setExtraProducts] = useState<ProductDto[]>([]);
+  const [searching, setSearching] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const allAvailableProducts = useMemo(() => {
+    const combined = [...products];
+    for (const ep of extraProducts) {
+      if (!combined.some((p) => p.id === ep.id)) {
+        combined.push(ep);
+      }
+    }
+    return combined;
+  }, [products, extraProducts]);
+
   const selectedProduct = useMemo(() => {
     if (!selectedProductId) return null;
-    return products.find((p) => p.id === selectedProductId) || null;
-  }, [selectedProductId, products]);
+    return allAvailableProducts.find((p) => p.id === selectedProductId) || null;
+  }, [selectedProductId, allAvailableProducts]);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -56,17 +69,61 @@ export const ProductSearchSelect: React.FC<ProductSearchSelectProps> = ({
     }
   }, [selectedProduct, selectedProductId, allowCustomItem]);
 
+  // Live API Search Debounce
+  useEffect(() => {
+    if (!isOpen) return;
+    const term = searchTerm.trim();
+    if (term.length < 2) return;
+
+    const timer = setTimeout(() => {
+      setSearching(true);
+      api.getProducts({ search: term, take: 50 })
+        .then((res) => {
+          if (res.items && res.items.length > 0) {
+            setExtraProducts((prev) => {
+              const next = [...prev];
+              for (const item of res.items) {
+                if (!next.some((p) => p.id === item.id)) {
+                  next.push(item);
+                }
+              }
+              return next;
+            });
+          }
+        })
+        .catch(console.error)
+        .finally(() => setSearching(false));
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, searchTerm]);
+
+  // When dropdown opens, if product pool is small, load fresh catalog
+  useEffect(() => {
+    if (isOpen && products.length < 30 && extraProducts.length === 0) {
+      api.getProducts({ take: 100 })
+        .then((res) => {
+          if (res.items) {
+            setExtraProducts(res.items);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [isOpen, products.length, extraProducts.length]);
+
   const filteredProducts = useMemo(() => {
-    if (!searchTerm.trim()) return products;
+    if (!searchTerm.trim()) return allAvailableProducts;
     const term = searchTerm.toLowerCase().trim();
-    return products.filter((p) => {
-      const matchName = p.name.toLowerCase().includes(term);
-      const matchSku = p.sku.toLowerCase().includes(term);
-      const matchCategory = p.category?.name?.toLowerCase().includes(term);
-      const matchBrand = p.brand?.name?.toLowerCase().includes(term);
-      return matchName || matchSku || matchCategory || matchBrand;
+    return allAvailableProducts.filter((p) => {
+      const matchName = (p.name || "").toLowerCase().includes(term);
+      const matchSku = (p.sku || "").toLowerCase().includes(term);
+      const matchCategory = (p.category?.name || "").toLowerCase().includes(term);
+      const matchBrand = (p.brand?.name || "").toLowerCase().includes(term);
+      const matchModel = (p.modelNumber || "").toLowerCase().includes(term);
+      const matchBarcode = (p.barcode || "").toLowerCase().includes(term);
+      return matchName || matchSku || matchCategory || matchBrand || matchModel || matchBarcode;
     });
-  }, [products, searchTerm]);
+  }, [allAvailableProducts, searchTerm]);
 
   const updatePosition = () => {
     if (!containerRef.current) return;

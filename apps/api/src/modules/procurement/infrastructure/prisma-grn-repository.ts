@@ -171,11 +171,22 @@ export class PrismaGrnRepository implements GrnRepository {
     }
 
     const executeCreation = async (tx: any) => {
+      // Prevent duplicate GRN numbers
+      if (tx.goodsReceiptNote) {
+        const existingGrn = await tx.goodsReceiptNote.findUnique({
+          where: { grnNumber: input.grnNumber },
+        });
+        if (existingGrn) {
+          throw new Error(`A Goods Receipt Note with number "${input.grnNumber}" already exists. Duplicate GRN submission prevented.`);
+        }
+      }
+
       // Validate against target PO and existing cumulative receipts
       if (tx.purchaseOrder) {
         const po = await tx.purchaseOrder.findUnique({
           where: { id: input.purchaseOrderId },
           include: {
+            grns: true,
             lines: {
               include: {
                 product: true,
@@ -191,36 +202,49 @@ export class PrismaGrnRepository implements GrnRepository {
           throw new Error(`Target Purchase Order (${input.purchaseOrderId}) not found.`);
         }
 
+        const isCancelled = (po.grns || []).some(
+          (g: any) => g.status === "CANCELLED" && (g.grnNumber.startsWith("CANCEL-") || !g.lines || g.lines.length === 0)
+        );
+        if (isCancelled) {
+          throw new Error(`Cannot receive goods against Purchase Order ${po.poNumber} because it is CANCELLED.`);
+        }
+
         // Validate each received line against its PO line remaining quantity
         for (const line of lines) {
           const poLine = po.lines?.find(
             (pl: any) => pl.id === line.purchaseOrderLineId || pl.productId === line.productId
           );
-          if (poLine) {
-            const alreadyReceived = (poLine.grnLines || [])
-              .filter(
-                (gl: any) =>
-                  gl.grn &&
-                  gl.grn.status !== "CANCELLED" &&
-                  gl.condition !== "DAMAGED" &&
-                  gl.condition !== "WRONG_SKU"
-              )
-              .reduce((sum: number, gl: any) => sum + (Number(gl.quantityReceived) || 0), 0);
+          if (!poLine) {
+            throw new Error(`Invalid line item: Product ${line.productId} is not part of Purchase Order ${po.poNumber}.`);
+          }
 
-            const orderedQty = Number(poLine.quantity) || 0;
-            const remainingDue = Math.max(0, orderedQty - alreadyReceived);
-            const currentQty = Number(line.quantityReceived) || 0;
+          // Auto-align line IDs
+          line.purchaseOrderLineId = poLine.id;
+          line.productId = poLine.productId;
 
-            if (
-              currentQty > remainingDue &&
-              input.status !== "DISCREPANT"
-            ) {
-              throw new Error(
-                `Over-receiving prevented: Attempted to receive ${currentQty} units for item "${
-                  poLine.product?.name || line.productId
-                }". Only ${remainingDue} units remaining due on this PO line (Ordered: ${orderedQty}, Previously Received: ${alreadyReceived}).`
-              );
-            }
+          const alreadyReceived = (poLine.grnLines || [])
+            .filter(
+              (gl: any) =>
+                gl.grn &&
+                gl.grn.status !== "CANCELLED" &&
+                gl.condition !== "DAMAGED" &&
+                gl.condition !== "WRONG_SKU"
+            )
+            .reduce((sum: number, gl: any) => sum + (Number(gl.quantityReceived) || 0), 0);
+
+          const orderedQty = Number(poLine.quantity) || 0;
+          const remainingDue = Math.max(0, orderedQty - alreadyReceived);
+          const currentQty = Number(line.quantityReceived) || 0;
+
+          if (
+            currentQty > remainingDue &&
+            input.status !== "DISCREPANT"
+          ) {
+            throw new Error(
+              `Over-receiving prevented: Attempted to receive ${currentQty} units for item "${
+                poLine.product?.name || line.productId
+              }". Only ${remainingDue} units remaining due on this PO line (Ordered: ${orderedQty}, Previously Received: ${alreadyReceived}).`
+            );
           }
         }
       }

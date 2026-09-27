@@ -19,7 +19,7 @@ export function requirePermission(...anyOf: string[]) {
       return;
     }
 
-    if (hasAnyPermission(req.user.permissions, anyOf)) {
+    if (isSuperAdminUser(req.user) || hasAnyPermission(req.user.permissions, anyOf)) {
       next();
       return;
     }

@@ -5,6 +5,7 @@ import { Plus, Trash2, FileText, Check, AlertCircle, Loader2, PackageCheck, Aler
 import { api } from "../../lib/api";
 import type { QuotationDto, BranchDto, CustomerDto, ProductDto } from "@bts/shared-types";
 import { ProductSearchSelect } from "../common/ProductSearchSelect";
+import { CustomerSearchSelect } from "../common/CustomerSearchSelect";
 import { WindowHeaderActions, WindowMinimizedPill } from "../common/WindowContainer";
 
 interface CreateQuotationModalProps {
@@ -244,22 +245,12 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({
               <label className="block text-caption font-semibold text-ink mb-1.5">
                 Customer Account <span className="text-danger">*</span>
               </label>
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none cursor-pointer"
+              <CustomerSearchSelect
+                customers={customers}
+                selectedCustomerId={customerId}
+                onSelect={(c) => setCustomerId(c?.id || "")}
                 required
-              >
-                {customers.length === 0 ? (
-                  <option value="">No active customers</option>
-                ) : (
-                  customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.displayName} ({c.customerCode})
-                    </option>
-                  ))
-                )}
-              </select>
+              />
             </div>
 
             <div>

@@ -70,3 +70,30 @@ export class DeleteCustomerUseCase {
     await this.customers.delete(id); // throws EntityInUseError itself if referenced elsewhere
   }
 }
+
+export class GetCustomerProfileUseCase {
+  constructor(private readonly customers: CustomerRepository) {}
+
+  async execute(id: string) {
+    const profile = await this.customers.getProfile(id);
+    if (!profile) throw new SimpleMasterDataNotFoundError("customer");
+    return profile;
+  }
+}
+
+export class TopupCustomerWalletUseCase {
+  constructor(private readonly customers: CustomerRepository) {}
+
+  async execute(customerId: string, amount: number, notes?: string, userId?: string) {
+    return this.customers.topupWallet(customerId, amount, notes, userId);
+  }
+}
+
+export class PayInvoiceFromWalletUseCase {
+  constructor(private readonly customers: CustomerRepository) {}
+
+  async execute(customerId: string, invoiceId: string, amount: number, notes?: string, userId?: string) {
+    return this.customers.payInvoiceFromWallet(customerId, invoiceId, amount, notes, userId);
+  }
+}
+

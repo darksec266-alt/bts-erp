@@ -13,7 +13,17 @@ import type { SimpleMasterDataPrismaClient } from "./modules/master-data/present
 import { PrismaCustomerRepository, type CustomerPrismaClient } from "./modules/master-data/infrastructure/prisma-customer-repository";
 import { PrismaProductRepository, type ProductPrismaClient } from "./modules/master-data/infrastructure/prisma-product-repository";
 import { PrismaSubCategoryRepository, type SubCategoryPrismaClient } from "./modules/master-data/infrastructure/prisma-sub-category-repository";
-import { CreateCustomerUseCase, GetCustomerUseCase, ListCustomersUseCase, UpdateCustomerUseCase, AddCustomerAddressUseCase, DeleteCustomerUseCase } from "./modules/master-data/application/customer.use-cases";
+import {
+  CreateCustomerUseCase,
+  GetCustomerUseCase,
+  ListCustomersUseCase,
+  UpdateCustomerUseCase,
+  AddCustomerAddressUseCase,
+  DeleteCustomerUseCase,
+  GetCustomerProfileUseCase,
+  TopupCustomerWalletUseCase,
+  PayInvoiceFromWalletUseCase,
+} from "./modules/master-data/application/customer.use-cases";
 import { CreateProductUseCase, GetProductUseCase, ListProductsUseCase, UpdateProductUseCase, DeleteProductUseCase } from "./modules/master-data/application/product.use-cases";
 import {
   CreateSubCategoryUseCase,
@@ -30,8 +40,8 @@ import { PrismaPurchaseInvoiceRepository, type PurchaseInvoicePrismaClient } fro
 import { PrismaSupplierPaymentRepository, type SupplierPaymentPrismaClient } from "./modules/procurement/infrastructure/prisma-supplier-payment-repository";
 import { PrismaPurchaseReturnRepository, type PurchaseReturnPrismaClient } from "./modules/procurement/infrastructure/prisma-purchase-return-repository";
 import { CreateSupplierUseCase, GetSupplierUseCase, ListSuppliersUseCase, UpdateSupplierUseCase, AddSupplierContactUseCase, DeleteSupplierUseCase } from "./modules/procurement/application/supplier.use-cases";
-import { CreatePurchaseRequestUseCase, GetPurchaseRequestUseCase, ListPurchaseRequestsUseCase, ApprovePurchaseRequestUseCase, RejectPurchaseRequestUseCase } from "./modules/procurement/application/purchase-request.use-cases";
-import { CreatePurchaseOrderUseCase, GetPurchaseOrderUseCase, ListPurchaseOrdersUseCase } from "./modules/procurement/application/purchase-order.use-cases";
+import { CreatePurchaseRequestUseCase, GetPurchaseRequestUseCase, ListPurchaseRequestsUseCase, ApprovePurchaseRequestUseCase, RejectPurchaseRequestUseCase, CancelPurchaseRequestUseCase } from "./modules/procurement/application/purchase-request.use-cases";
+import { CreatePurchaseOrderUseCase, GetPurchaseOrderUseCase, ListPurchaseOrdersUseCase, CancelPurchaseOrderUseCase } from "./modules/procurement/application/purchase-order.use-cases";
 import { ReceiveGoodsUseCase, GetGrnUseCase, ListGrnsUseCase, ApproveGrnDiscrepancyUseCase, UpdateGrnStatusUseCase, CancelGrnUseCase } from "./modules/procurement/application/grn.use-cases";
 import { CreatePurchaseInvoiceUseCase, GetPurchaseInvoiceUseCase } from "./modules/procurement/application/purchase-invoice.use-cases";
 import { RecordSupplierPaymentUseCase } from "./modules/procurement/application/supplier-payment.use-case";
@@ -79,6 +89,10 @@ import {
   ListPaymentsUseCase,
   CreateBankTransactionProofUseCase,
   GetBankTransactionProofUseCase,
+  CreateSalesReturnUseCase,
+  GetSalesReturnUseCase,
+  ListSalesReturnsUseCase,
+  GetInvoiceReturnableItemsUseCase,
 } from "./modules/sales/application/sales.use-cases";
 
 import { PrismaInventoryRepository } from "./modules/inventory/infrastructure/prisma-inventory-repository";
@@ -233,6 +247,9 @@ const app = createApp({ identity, employeeAndRoleManagement, masterData: {
       updateCustomerUseCase: new UpdateCustomerUseCase(customerRepository),
       addCustomerAddressUseCase: new AddCustomerAddressUseCase(customerRepository),
       deleteCustomerUseCase: new DeleteCustomerUseCase(customerRepository),
+      getCustomerProfileUseCase: new GetCustomerProfileUseCase(customerRepository),
+      topupCustomerWalletUseCase: new TopupCustomerWalletUseCase(customerRepository),
+      payInvoiceFromWalletUseCase: new PayInvoiceFromWalletUseCase(customerRepository),
     };
   })(),
   product: (() => {
@@ -262,6 +279,7 @@ const app = createApp({ identity, employeeAndRoleManagement, masterData: {
   return {
     tokenService,
     approvalService,
+    prisma,
     supplier: {
       createSupplierUseCase: new CreateSupplierUseCase(supplierRepository),
       getSupplierUseCase: new GetSupplierUseCase(supplierRepository),
@@ -276,6 +294,7 @@ const app = createApp({ identity, employeeAndRoleManagement, masterData: {
       listPurchaseRequestsUseCase: new ListPurchaseRequestsUseCase(purchaseRequestRepository),
       approvePurchaseRequestUseCase: new ApprovePurchaseRequestUseCase(purchaseRequestRepository, approvalService),
       rejectPurchaseRequestUseCase: new RejectPurchaseRequestUseCase(purchaseRequestRepository, approvalService),
+      cancelPurchaseRequestUseCase: new CancelPurchaseRequestUseCase(purchaseRequestRepository),
     },
     purchaseOrder: (() => {
       const purchaseOrderRepository = new PrismaPurchaseOrderRepository(prisma);
@@ -283,6 +302,7 @@ const app = createApp({ identity, employeeAndRoleManagement, masterData: {
         createPurchaseOrderUseCase: new CreatePurchaseOrderUseCase(purchaseOrderRepository, purchaseRequestRepository),
         getPurchaseOrderUseCase: new GetPurchaseOrderUseCase(purchaseOrderRepository),
         listPurchaseOrdersUseCase: new ListPurchaseOrdersUseCase(purchaseOrderRepository),
+        cancelPurchaseOrderUseCase: new CancelPurchaseOrderUseCase(purchaseOrderRepository),
       };
     })(),
     grn: (() => {
@@ -360,6 +380,10 @@ const app = createApp({ identity, employeeAndRoleManagement, masterData: {
       listPaymentsUseCase: new ListPaymentsUseCase(salesRepository),
       createBankTransactionProofUseCase: new CreateBankTransactionProofUseCase(salesRepository),
       getBankTransactionProofUseCase: new GetBankTransactionProofUseCase(salesRepository),
+      createSalesReturnUseCase: new CreateSalesReturnUseCase(salesRepository),
+      getSalesReturnUseCase: new GetSalesReturnUseCase(salesRepository),
+      listSalesReturnsUseCase: new ListSalesReturnsUseCase(salesRepository),
+      getInvoiceReturnableItemsUseCase: new GetInvoiceReturnableItemsUseCase(salesRepository),
     };
   })(),
   inventory: (() => {

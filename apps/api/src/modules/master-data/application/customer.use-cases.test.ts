@@ -30,6 +30,9 @@ function makeRepo(overrides: Partial<jest.Mocked<CustomerRepository>> = {}): jes
     update: jest.fn().mockResolvedValue({ ...sampleCustomer, displayName: "Updated" }),
     addAddress: jest.fn().mockResolvedValue({ ...sampleCustomer, addresses: [{ id: "addr_1", label: "Warehouse", addressLine: "..." }] }),
     delete: jest.fn().mockResolvedValue(undefined),
+    getProfile: jest.fn().mockResolvedValue(null),
+    topupWallet: jest.fn().mockResolvedValue({} as any),
+    payInvoiceFromWallet: jest.fn().mockResolvedValue({} as any),
     ...overrides,
   };
 }

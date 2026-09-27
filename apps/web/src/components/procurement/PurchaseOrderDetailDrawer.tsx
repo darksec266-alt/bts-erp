@@ -103,14 +103,18 @@ export const PurchaseOrderDetailDrawer: React.FC<PurchaseOrderDetailDrawerProps>
                 <span className="mt-0.5 block">
                   <span
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                      purchaseOrder.fulfillmentStatus === "FULLY_RECEIVED"
+                      purchaseOrder.fulfillmentStatus === "CANCELLED" || (purchaseOrder as any).status === "CANCELLED"
+                        ? "bg-red-500/10 text-red-700 border-red-500/20"
+                        : purchaseOrder.fulfillmentStatus === "FULLY_RECEIVED"
                         ? "bg-success/10 text-success border-success/20"
                         : purchaseOrder.fulfillmentStatus === "PARTIALLY_RECEIVED"
                         ? "bg-blue-500/10 text-blue-700 border-blue-500/20"
                         : "bg-amber-500/10 text-amber-700 border-amber-500/20"
                     }`}
                   >
-                    {purchaseOrder.fulfillmentStatus === "FULLY_RECEIVED"
+                    {purchaseOrder.fulfillmentStatus === "CANCELLED" || (purchaseOrder as any).status === "CANCELLED"
+                      ? "Cancelled"
+                      : purchaseOrder.fulfillmentStatus === "FULLY_RECEIVED"
                       ? "Fully Received"
                       : purchaseOrder.fulfillmentStatus === "PARTIALLY_RECEIVED"
                       ? "Partially Received"
@@ -296,19 +300,22 @@ export const PurchaseOrderDetailDrawer: React.FC<PurchaseOrderDetailDrawerProps>
             >
               Close
             </button>
-            {onRecordGrn && (
-              <button
-                type="button"
-                onClick={() => {
-                  onRecordGrn(purchaseOrder);
-                  onClose();
-                }}
-                className="flex items-center gap-2 px-5 py-2 bg-success text-white rounded-sm text-body font-medium hover:bg-success/90 shadow-elevation-1 transition-all"
-              >
-                <PackageCheck className="w-4 h-4" />
-                <span>Receive Goods (GRN)</span>
-              </button>
-            )}
+            {onRecordGrn &&
+              purchaseOrder.fulfillmentStatus !== "FULLY_RECEIVED" &&
+              purchaseOrder.fulfillmentStatus !== "CANCELLED" &&
+              (purchaseOrder as any).status !== "CANCELLED" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRecordGrn(purchaseOrder);
+                    onClose();
+                  }}
+                  className="flex items-center gap-2 px-5 py-2 bg-success text-white rounded-sm text-body font-medium hover:bg-success/90 shadow-elevation-1 transition-all"
+                >
+                  <PackageCheck className="w-4 h-4" />
+                  <span>Receive Goods (GRN)</span>
+                </button>
+              )}
           </div>
         </div>
       </div>

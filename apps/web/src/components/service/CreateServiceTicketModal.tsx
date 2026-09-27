@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Wrench, AlertCircle, Loader2, ShieldCheck, DollarSign } from "lucide-react";
 import { api } from "../../lib/api";
 import type { CustomerDto, BranchDto, TicketDto, TicketType } from "@bts/shared-types";
+import { CustomerSearchSelect } from "../common/CustomerSearchSelect";
 import { WindowHeaderActions, WindowMinimizedPill } from "../common/WindowContainer";
 
 interface CreateServiceTicketModalProps {
@@ -197,19 +198,12 @@ export const CreateServiceTicketModal: React.FC<CreateServiceTicketModalProps> =
               <label className="block text-caption font-semibold text-ink mb-1.5">
                 Customer Account <span className="text-danger">*</span>
               </label>
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none cursor-pointer"
+              <CustomerSearchSelect
+                customers={customers}
+                selectedCustomerId={customerId}
+                onSelect={(c) => setCustomerId(c?.id || "")}
                 required
-              >
-                <option value="">Select customer</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.displayName} ({c.customerCode}) {c.isServiceOnly ? "[Service-Only]" : ""}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>

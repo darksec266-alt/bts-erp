@@ -14,6 +14,7 @@ export interface CustomerRecord {
   displayName: string;
   phone: string;
   branchId: string;
+  walletBalance?: number;
   branch?: {
     id: string;
     code: string;
@@ -24,6 +25,36 @@ export interface CustomerRecord {
   addresses: { id: string; label: string; addressLine: string }[];
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+export interface CustomerFinancialSummary {
+  totalInvoiced: number;
+  totalPaid: number;
+  totalReturned: number;
+  currentDue: number;
+  walletBalance: number;
+}
+
+export interface CustomerWalletTransactionRecord {
+  id: string;
+  customerId: string;
+  amount: number;
+  type: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  balanceAfter: number;
+  notes?: string | null;
+  createdById?: string | null;
+  createdAt: Date | string;
+}
+
+export interface CustomerProfileRecord {
+  customer: CustomerRecord;
+  summary: CustomerFinancialSummary;
+  invoices: any[];
+  salesReturns: any[];
+  payments: any[];
+  walletTransactions: CustomerWalletTransactionRecord[];
 }
 
 export interface CreateCustomerInput {
@@ -58,4 +89,8 @@ export interface CustomerRepository {
   update(id: string, input: UpdateCustomerInput): Promise<CustomerRecord>;
   addAddress(customerId: string, input: CustomerAddressInput): Promise<CustomerRecord>;
   delete(id: string): Promise<void>; // throws EntityInUseError (modules/master-data's shared error) if referenced elsewhere
+  getProfile(id: string): Promise<CustomerProfileRecord | null>;
+  topupWallet(customerId: string, amount: number, notes?: string, userId?: string): Promise<CustomerWalletTransactionRecord>;
+  payInvoiceFromWallet(customerId: string, invoiceId: string, amount: number, notes?: string, userId?: string): Promise<{ payment: any; transaction: CustomerWalletTransactionRecord }>;
 }
+

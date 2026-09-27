@@ -2,13 +2,14 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { sendData, sendError } from "../../../shared/http";
 import { requirePermission } from "../../../shared/security/require-permission.middleware";
-import { CreatePurchaseOrderUseCase, GetPurchaseOrderUseCase, ListPurchaseOrdersUseCase, PurchaseRequestNotApprovedError, PurchaseRequestAlreadyOrderedError } from "../application/purchase-order.use-cases";
+import { CreatePurchaseOrderUseCase, GetPurchaseOrderUseCase, ListPurchaseOrdersUseCase, CancelPurchaseOrderUseCase, PurchaseRequestNotApprovedError, PurchaseRequestAlreadyOrderedError } from "../application/purchase-order.use-cases";
 import { SimpleMasterDataNotFoundError } from "../../master-data/domain/simple-master-data.types";
 
 export function createPurchaseOrderRouter(deps: {
   createPurchaseOrderUseCase: CreatePurchaseOrderUseCase;
   getPurchaseOrderUseCase: GetPurchaseOrderUseCase;
   listPurchaseOrdersUseCase: ListPurchaseOrdersUseCase;
+  cancelPurchaseOrderUseCase?: CancelPurchaseOrderUseCase;
 }): Router {
   const router = Router();
 
@@ -45,10 +46,15 @@ export function createPurchaseOrderRouter(deps: {
   });
 
   router.get("/purchase-orders", requirePermission("procurement.view", "procurement.manage"), async (req: Request, res: Response) => {
-    const { branchId, supplierId, skip, take } = req.query;
+    const { branchId, supplierId, status, search, skip, take } = req.query;
     const result = await deps.listPurchaseOrdersUseCase.execute(
-      { branchId: typeof branchId === "string" ? branchId : undefined, supplierId: typeof supplierId === "string" ? supplierId : undefined },
-      { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 100) }
+      {
+        branchId: typeof branchId === "string" ? branchId : undefined,
+        supplierId: typeof supplierId === "string" ? supplierId : undefined,
+        status: typeof status === "string" ? status : undefined,
+        search: typeof search === "string" ? search : undefined,
+      },
+      { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 500) }
     );
     sendData(res, result);
   });
@@ -65,5 +71,25 @@ export function createPurchaseOrderRouter(deps: {
     }
   });
 
+  router.post("/purchase-orders/:id/cancel", requirePermission("procurement.manage"), async (req: Request, res: Response) => {
+    try {
+      if (!deps.cancelPurchaseOrderUseCase) {
+        sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Cancel purchase order not configured" });
+        return;
+      }
+      const { reason } = req.body ?? {};
+      const updated = await deps.cancelPurchaseOrderUseCase.execute(req.params.id!, req.user!.sub, reason);
+      sendData(res, updated);
+    } catch (err: unknown) {
+      if (err instanceof SimpleMasterDataNotFoundError) {
+        sendError(res, 404, { code: "NOT_FOUND", message: err.message });
+        return;
+      }
+      const message = err instanceof Error ? err.message : "Failed to cancel purchase order";
+      sendError(res, 400, { code: "CANCEL_FAILED", message });
+    }
+  });
+
   return router;
 }
+

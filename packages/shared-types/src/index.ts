@@ -272,6 +272,9 @@ export interface InvoiceDto {
   customerId: string;
   branchId: string;
   grandTotal: number;
+  totalPaid?: number;
+  returnedAmount?: number;
+  dueAmount?: number;
   status: "DRAFT" | "POSTED" | "CANCELLED";
   idempotencyKey?: string;
   createdAt: string | Date;

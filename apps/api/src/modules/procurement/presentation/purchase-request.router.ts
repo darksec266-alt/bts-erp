@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { sendData, sendError } from "../../../shared/http";
 import { requirePermission, isSuperAdminUser } from "../../../shared/security/require-permission.middleware";
-import { CreatePurchaseRequestUseCase, GetPurchaseRequestUseCase, ListPurchaseRequestsUseCase, ApprovePurchaseRequestUseCase, RejectPurchaseRequestUseCase } from "../application/purchase-request.use-cases";
+import { CreatePurchaseRequestUseCase, GetPurchaseRequestUseCase, ListPurchaseRequestsUseCase, ApprovePurchaseRequestUseCase, RejectPurchaseRequestUseCase, CancelPurchaseRequestUseCase } from "../application/purchase-request.use-cases";
 import { SimpleMasterDataNotFoundError } from "../../master-data/domain/simple-master-data.types";
 import { SelfApprovalError, ApprovalAlreadyResolvedError, ApprovalRequestNotFoundError } from "../../../shared/approval/approval.service";
 
@@ -12,6 +12,7 @@ export function createPurchaseRequestRouter(deps: {
   listPurchaseRequestsUseCase: ListPurchaseRequestsUseCase;
   approvePurchaseRequestUseCase: ApprovePurchaseRequestUseCase;
   rejectPurchaseRequestUseCase: RejectPurchaseRequestUseCase;
+  cancelPurchaseRequestUseCase?: CancelPurchaseRequestUseCase;
 }): Router {
   const router = Router();
 
@@ -38,7 +39,7 @@ export function createPurchaseRequestRouter(deps: {
     const { branchId, status, skip, take } = req.query;
     const result = await deps.listPurchaseRequestsUseCase.execute(
       { branchId: typeof branchId === "string" ? branchId : undefined, status: typeof status === "string" ? status : undefined },
-      { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 100) }
+      { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 500) }
     );
     sendData(res, result);
   });
@@ -99,5 +100,24 @@ export function createPurchaseRequestRouter(deps: {
     }
   });
 
+  router.post("/purchase-requests/:id/cancel", requirePermission("procurement.manage"), async (req: Request, res: Response) => {
+    try {
+      if (!deps.cancelPurchaseRequestUseCase) {
+        sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Cancel requisition not configured" });
+        return;
+      }
+      const updated = await deps.cancelPurchaseRequestUseCase.execute(req.params.id!, req.user!.sub);
+      sendData(res, updated);
+    } catch (err: unknown) {
+      if (err instanceof SimpleMasterDataNotFoundError) {
+        sendError(res, 404, { code: "NOT_FOUND", message: err.message });
+        return;
+      }
+      const message = err instanceof Error ? err.message : "Failed to cancel purchase requisition";
+      sendError(res, 400, { code: "CANCEL_FAILED", message });
+    }
+  });
+
   return router;
 }
+

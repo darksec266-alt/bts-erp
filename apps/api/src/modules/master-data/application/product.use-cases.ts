@@ -6,7 +6,13 @@ export class CreateProductUseCase {
 
   async execute(input: CreateProductInput): Promise<ProductRecord> {
     const existing = await this.products.findBySku(input.sku);
-    if (existing) throw new DuplicateKeyError("product", input.sku);
+    if (existing) throw new DuplicateKeyError("product SKU", input.sku);
+
+    if (input.barcode && input.barcode.trim()) {
+      const existingBarcode = await this.products.findByBarcode(input.barcode.trim());
+      if (existingBarcode) throw new DuplicateKeyError("product barcode", input.barcode.trim());
+    }
+
     return this.products.create(input);
   }
 }
@@ -35,6 +41,14 @@ export class UpdateProductUseCase {
   async execute(id: string, input: UpdateProductInput): Promise<ProductRecord> {
     const existing = await this.products.findById(id);
     if (!existing) throw new SimpleMasterDataNotFoundError("product");
+
+    if (input.barcode && input.barcode.trim()) {
+      const existingBarcode = await this.products.findByBarcode(input.barcode.trim());
+      if (existingBarcode && existingBarcode.id !== id) {
+        throw new DuplicateKeyError("product barcode", input.barcode.trim());
+      }
+    }
+
     return this.products.update(id, input);
   }
 }

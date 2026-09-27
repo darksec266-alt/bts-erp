@@ -585,6 +585,9 @@ export const ProductList: React.FC = () => {
         onClose={() => setCreateModalOpen(false)}
         onSuccess={(created) => {
           addToast("success", `Product ${created.sku} registered successfully!`);
+          setProducts((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
+          setTotalCount((prev) => prev + 1);
+          setPage(1);
           fetchProducts();
         }}
         categories={categories}

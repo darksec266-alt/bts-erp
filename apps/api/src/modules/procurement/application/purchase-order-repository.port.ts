@@ -19,7 +19,8 @@ export interface PurchaseOrderRecord {
   branchId: string;
   grandTotal: string;
   createdAt?: Date | string;
-  fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED";
+  status?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED" | "CANCELLED";
+  fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED" | "CANCELLED";
   totalOrderedQuantity?: number;
   totalReceivedQuantity?: number;
   totalRemainingQuantity?: number;
@@ -57,5 +58,7 @@ export interface CreatePurchaseOrderInput {
 export interface PurchaseOrderRepository {
   create(input: CreatePurchaseOrderInput): Promise<PurchaseOrderRecord>;
   findById(id: string): Promise<PurchaseOrderRecord | null>;
-  list(filter: { branchId?: string; supplierId?: string }, page: { skip: number; take: number }): Promise<{ items: PurchaseOrderRecord[]; total: number }>;
+  list(filter: { branchId?: string; supplierId?: string; status?: string; search?: string }, page: { skip: number; take: number }): Promise<{ items: PurchaseOrderRecord[]; total: number }>;
+  cancel?(id: string, cancelledById: string, reason?: string): Promise<PurchaseOrderRecord>;
 }
+

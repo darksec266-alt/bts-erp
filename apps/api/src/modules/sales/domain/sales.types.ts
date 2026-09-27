@@ -594,6 +594,7 @@ export interface SalesReturnEntity {
   id: string;
   returnNumber: string;
   invoiceId: string;
+  invoiceNumber?: string;
   customerId: string;
   branchId: string;
   warehouseId: string;

@@ -873,6 +873,7 @@ model LiveLocationLog {
 enum TicketType {
   WARRANTY_CLAIM
   PAID_SERVICE_REQUEST
+  COMPLAINT
 }
 enum TicketStatus {
   OPEN
@@ -882,6 +883,7 @@ enum TicketStatus {
   IN_PROGRESS
   RESOLVED
   CLOSED
+  CANCELLED
 }
 
 model Ticket {
@@ -916,14 +918,14 @@ enum WarrantyStatus {
 
 model Warranty {
   id             String         @id @default(cuid())
-  serialNumberId String         @unique
+  serialNumberId String?        @unique
   startDate      DateTime       @db.Date
   endDate        DateTime       @db.Date
   termMonths     Int
   status         WarrantyStatus @default(ACTIVE)
   createdAt      DateTime       @default(now())
 
-  serialNumber SerialNumber    @relation(fields: [serialNumberId], references: [id], onDelete: Restrict)
+  serialNumber SerialNumber?   @relation(fields: [serialNumberId], references: [id], onDelete: SetNull)
   claims       WarrantyClaim[]
 
   @@index([status])
@@ -1062,6 +1064,7 @@ enum VoucherStatus {
   DRAFT
   POSTED
   REVERSED
+  CANCELLED
 }
 
 model Voucher {

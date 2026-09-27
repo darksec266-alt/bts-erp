@@ -5,6 +5,7 @@ export interface ProductPrismaClient {
   product: {
     create(args: { data: Record<string, unknown>; include?: Record<string, unknown> }): Promise<ProductRow>;
     findUnique(args: { where: { id?: string; sku?: string }; include?: Record<string, unknown> }): Promise<ProductRow | null>;
+    findFirst(args: { where: Record<string, unknown>; include?: Record<string, unknown> }): Promise<ProductRow | null>;
     findMany(args: { where: Record<string, unknown>; skip?: number; take?: number; include?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ProductRow[]>;
     count(args: { where: Record<string, unknown> }): Promise<number>;
     update(args: { where: { id: string }; data: Record<string, unknown>; include?: Record<string, unknown> }): Promise<ProductRow>;
@@ -36,6 +37,8 @@ interface ProductRow {
     quantityOnHand: { toString(): string } | number;
     warehouse: { id: string; code: string; name: string };
   }[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 const PRODUCT_INCLUDES = {
@@ -85,6 +88,8 @@ function toRecord(row: ProductRow): ProductRecord {
     unit: unit ? { id: unit.id, code: unit.code, name: unit.name } : null,
     totalStock,
     stockLedgers: stockList,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -115,6 +120,14 @@ export class PrismaProductRepository implements ProductRepository {
     return row ? toRecord(row) : null;
   }
 
+  async findByBarcode(barcode: string): Promise<ProductRecord | null> {
+    const row = await this.prisma.product.findFirst({
+      where: { barcode },
+      include: PRODUCT_INCLUDES,
+    });
+    return row ? toRecord(row) : null;
+  }
+
   async list(filter: ProductListFilter, page: { skip: number; take: number }): Promise<{ items: ProductRecord[]; total: number }> {
     const where: Record<string, unknown> = {};
     if (filter.categoryId) where.categoryId = filter.categoryId;
@@ -138,6 +151,7 @@ export class PrismaProductRepository implements ProductRepository {
         skip: page.skip,
         take: page.take,
         include: PRODUCT_INCLUDES,
+        orderBy: { createdAt: "desc" },
       }),
       this.prisma.product.count({ where }),
     ]);

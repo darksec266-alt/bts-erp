@@ -7,6 +7,7 @@ export interface PurchaseOrderPrismaClient {
     findMany(args: { where: Record<string, unknown>; skip: number; take: number; include: Record<string, unknown>; orderBy?: Record<string, string> }): Promise<any[]>;
     count(args: { where: Record<string, unknown> }): Promise<number>;
   };
+  goodsReceiptNote?: any;
 }
 
 const poInclude = {
@@ -68,8 +69,14 @@ function toRecord(row: any): PurchaseOrderRecord {
   });
 
   const poRemaining = Math.max(0, poTotalOrdered - poTotalReceived);
-  let poStatus: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED" = "PENDING_RECEIPT";
-  if (poTotalReceived >= poTotalOrdered && poTotalOrdered > 0) {
+  const isCancelledMarker = (row.grns || []).some(
+    (g: any) => g.status === "CANCELLED" && (g.grnNumber.startsWith("CANCEL-") || !g.lines || g.lines.length === 0)
+  );
+
+  let poStatus: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED" | "CANCELLED" = "PENDING_RECEIPT";
+  if (isCancelledMarker && poTotalReceived === 0) {
+    poStatus = "CANCELLED";
+  } else if (poTotalReceived >= poTotalOrdered && poTotalOrdered > 0) {
     poStatus = "FULLY_RECEIVED";
   } else if (poTotalReceived > 0) {
     poStatus = "PARTIALLY_RECEIVED";
@@ -90,6 +97,7 @@ function toRecord(row: any): PurchaseOrderRecord {
     branchId: row.branchId,
     grandTotal: row.grandTotal.toString(),
     createdAt: row.createdAt,
+    status: poStatus,
     fulfillmentStatus: poStatus,
     totalOrderedQuantity: poTotalOrdered,
     totalReceivedQuantity: poTotalReceived,
@@ -135,10 +143,13 @@ export class PrismaPurchaseOrderRepository implements PurchaseOrderRepository {
     return row ? toRecord(row) : null;
   }
 
-  async list(filter: { branchId?: string; supplierId?: string }, page: { skip: number; take: number }): Promise<{ items: PurchaseOrderRecord[]; total: number }> {
+  async list(filter: { branchId?: string; supplierId?: string; status?: string; search?: string }, page: { skip: number; take: number }): Promise<{ items: PurchaseOrderRecord[]; total: number }> {
     const where: Record<string, unknown> = {};
     if (filter.branchId) where.branchId = filter.branchId;
     if (filter.supplierId) where.supplierId = filter.supplierId;
+    if (filter.search) {
+      where.poNumber = { contains: filter.search, mode: "insensitive" };
+    }
     const [rows, total] = await Promise.all([
       this.prisma.purchaseOrder.findMany({
         where,
@@ -149,6 +160,46 @@ export class PrismaPurchaseOrderRepository implements PurchaseOrderRepository {
       }),
       this.prisma.purchaseOrder.count({ where }),
     ]);
-    return { items: rows.map(toRecord), total };
+    let items = rows.map(toRecord);
+    if (filter.status) {
+      items = items.filter((po) => po.fulfillmentStatus === filter.status || po.status === filter.status);
+    }
+    return { items, total };
+  }
+
+  async cancel(id: string, cancelledById: string, reason?: string): Promise<PurchaseOrderRecord> {
+    const po = await this.prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: poInclude,
+    });
+    if (!po) throw new Error("Purchase order not found");
+
+    const record = toRecord(po);
+    if (record.totalReceivedQuantity && record.totalReceivedQuantity > 0) {
+      throw new Error(
+        `Cannot cancel Purchase Order ${record.poNumber} because ${record.totalReceivedQuantity} units have already been received. Please void/cancel the associated Goods Receipt Notes or process a Purchase Return first.`
+      );
+    }
+
+    const cancelGrnNumber = `CANCEL-${record.poNumber}`;
+    const existingMarker = (po.grns || []).find((g: any) => g.grnNumber === cancelGrnNumber);
+    if (!existingMarker && (this.prisma as any).goodsReceiptNote) {
+      await (this.prisma as any).goodsReceiptNote.create({
+        data: {
+          grnNumber: cancelGrnNumber,
+          purchaseOrderId: id,
+          status: "CANCELLED",
+          receivedById: cancelledById,
+          receivedAt: new Date(),
+        },
+      });
+    }
+
+    const updated = await this.prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: poInclude,
+    });
+    return toRecord(updated);
   }
 }
+

@@ -4,6 +4,10 @@ import type {
   CustomerListResponse,
   CreateCustomerRequest,
   UpdateCustomerRequest,
+  CustomerProfileDto,
+  CustomerWalletTransactionDto,
+  SalesReturnDto,
+  CreateSalesReturnRequest,
   BranchDto,
   QuotationDto,
   CreateQuotationRequest,
@@ -357,6 +361,30 @@ class ApiService {
     });
   }
 
+  public async getCustomerProfile(id: string): Promise<CustomerProfileDto> {
+    return this.request<CustomerProfileDto>(`/customers/${id}/profile`);
+  }
+
+  public async topupCustomerWallet(
+    id: string,
+    data: { amount: number; notes?: string }
+  ): Promise<CustomerWalletTransactionDto> {
+    return this.request<CustomerWalletTransactionDto>(`/customers/${id}/wallet/topup`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async payInvoiceFromWallet(
+    id: string,
+    data: { invoiceId: string; amount: number; notes?: string }
+  ): Promise<{ payment: PaymentDto; transaction: CustomerWalletTransactionDto }> {
+    return this.request<{ payment: PaymentDto; transaction: CustomerWalletTransactionDto }>(`/customers/${id}/wallet/pay-invoice`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
   // --- Branches API ---
   public async getBranches(): Promise<{ items: BranchDto[]; total: number }> {
     return this.request<{ items: BranchDto[]; total: number }>("/branches");
@@ -546,6 +574,56 @@ class ApiService {
   public async getInvoice(id: string): Promise<InvoiceDto> {
     return this.request<InvoiceDto>(`/sales/invoices/${id}`);
   }
+
+  // -------------------------------------------------------------
+  // Sales Returns & Customer Wallet
+  // -------------------------------------------------------------
+  public async getInvoiceReturnableItems(invoiceId: string): Promise<{
+    invoice: InvoiceDto;
+    items: {
+      productId: string;
+      productName: string;
+      sku: string;
+      trackingType: "SERIALIZED" | "NON_SERIALIZED";
+      invoicedQuantity: number;
+      alreadyReturnedQuantity: number;
+      returnableQuantity: number;
+      unitPrice: number;
+      soldSerials: string[];
+    }[];
+  }> {
+    return this.request(`/sales/invoices/${invoiceId}/returnable-items`);
+  }
+
+  public async createSalesReturn(data: CreateSalesReturnRequest): Promise<SalesReturnDto> {
+    return this.request<SalesReturnDto>("/sales/returns", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async getSalesReturns(params?: {
+    customerId?: string;
+    branchId?: string;
+    skip?: number;
+    take?: number;
+  }): Promise<{ items: SalesReturnDto[]; total: number }> {
+    const searchParams = new URLSearchParams();
+    if (params?.customerId) searchParams.set("customerId", params.customerId);
+    if (params?.branchId) searchParams.set("branchId", params.branchId);
+    if (params?.skip !== undefined) searchParams.set("skip", String(params.skip));
+    if (params?.take !== undefined) searchParams.set("take", String(params.take));
+
+    const qs = searchParams.toString();
+    return this.request<{ items: SalesReturnDto[]; total: number }>(
+      `/sales/returns${qs ? `?${qs}` : ""}`
+    );
+  }
+
+  public async getSalesReturn(id: string): Promise<SalesReturnDto> {
+    return this.request<SalesReturnDto>(`/sales/returns/${id}`);
+  }
+
 
   // -------------------------------------------------------------
   // Sales: Projects & Multi-Challan Workflow
@@ -1152,18 +1230,27 @@ class ApiService {
   // -------------------------------------------------------------
   public async getProcurementStats(): Promise<ProcurementStatsDto> {
     try {
+      const res = await this.request<ProcurementStatsDto>("/procurement/stats");
+      if (res && typeof res.totalPOs === "number") {
+        return res;
+      }
+    } catch {
+      // Fallback to client-side aggregation if backend endpoint unavailable
+    }
+
+    try {
       const [pos, prs, suppliers, grns] = await Promise.all([
-        this.getPurchaseOrders({ take: 100 }),
-        this.getPurchaseRequests({ take: 100 }),
-        this.getSuppliers({ take: 100 }),
-        this.getGrns({ take: 100 }),
+        this.getPurchaseOrders({ take: 500 }),
+        this.getPurchaseRequests({ take: 500 }),
+        this.getSuppliers({ take: 500 }),
+        this.getGrns({ take: 500 }),
       ]);
       const totalSpend = pos.items.reduce((sum, po) => sum + Number(po.grandTotal || 0), 0);
       const pendingPRs = prs.items.filter((pr) => pr.status === "PENDING").length;
 
-      const pendingPOs = pos.items.filter((p) => p.fulfillmentStatus === "PENDING_RECEIPT").length;
-      const partiallyReceivedPOs = pos.items.filter((p) => p.fulfillmentStatus === "PARTIALLY_RECEIVED").length;
-      const fullyReceivedPOs = pos.items.filter((p) => p.fulfillmentStatus === "FULLY_RECEIVED").length;
+      const pendingPOs = pos.items.filter((p) => p.fulfillmentStatus === "PENDING_RECEIPT" || (p as any).status === "PENDING_RECEIPT").length;
+      const partiallyReceivedPOs = pos.items.filter((p) => p.fulfillmentStatus === "PARTIALLY_RECEIVED" || (p as any).status === "PARTIALLY_RECEIVED").length;
+      const fullyReceivedPOs = pos.items.filter((p) => p.fulfillmentStatus === "FULLY_RECEIVED" || (p as any).status === "FULLY_RECEIVED").length;
 
       const totalPurchasedQuantity = pos.items.reduce((sum, p) => sum + (p.totalOrderedQuantity || 0), 0);
       const totalReceivedQuantity = pos.items.reduce((sum, p) => sum + (p.totalReceivedQuantity || 0), 0);

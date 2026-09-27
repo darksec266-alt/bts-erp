@@ -87,3 +87,17 @@ export class RejectPurchaseRequestUseCase {
     await this.purchaseRequests.updateStatus(purchaseRequestId, "REJECTED");
   }
 }
+
+export class CancelPurchaseRequestUseCase {
+  constructor(private readonly purchaseRequests: PurchaseRequestRepository) {}
+
+  async execute(purchaseRequestId: string, cancelledById: string): Promise<PurchaseRequestRecord> {
+    const request = await this.purchaseRequests.findById(purchaseRequestId);
+    if (!request) throw new SimpleMasterDataNotFoundError("purchase requisition");
+    if (!this.purchaseRequests.cancel) {
+      throw new Error("Cancellation is not supported by the purchase request repository.");
+    }
+    return this.purchaseRequests.cancel(purchaseRequestId, cancelledById);
+  }
+}
+

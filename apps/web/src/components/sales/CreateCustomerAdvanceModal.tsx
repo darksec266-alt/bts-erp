@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowDownLeft, Loader2, AlertCircle, FileCheck } from "lucide-react";
 import { api } from "../../lib/api";
 import type { CustomerDto, BranchDto, CustomerAdvanceDto } from "@bts/shared-types";
+import { CustomerSearchSelect } from "../common/CustomerSearchSelect";
 import { WindowHeaderActions, WindowMinimizedPill } from "../common/WindowContainer";
 
 interface CreateCustomerAdvanceModalProps {
@@ -166,19 +167,12 @@ export const CreateCustomerAdvanceModal: React.FC<CreateCustomerAdvanceModalProp
               <label className="block text-caption font-medium text-text-muted mb-1">
                 Customer <span className="text-danger">*</span>
               </label>
-              <select
-                value={customerId || defaultCustomerId || (customers[0]?.id ?? "")}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full h-10 px-3 border border-border rounded-sm bg-surface text-ink text-body focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              <CustomerSearchSelect
+                customers={customers}
+                selectedCustomerId={customerId || defaultCustomerId}
+                onSelect={(c) => setCustomerId(c?.id || "")}
                 required
-              >
-                <option value="">Select customer...</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.displayName} ({c.customerCode})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>

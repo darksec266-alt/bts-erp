@@ -29,6 +29,7 @@ export interface CustomerDto {
     branch?: BranchSummaryDto;
     isServiceOnly: boolean;
     isActive: boolean;
+    walletBalance?: number;
     addresses: CustomerAddressDto[];
     createdAt?: string | Date;
     updatedAt?: string | Date;
@@ -242,6 +243,9 @@ export interface InvoiceDto {
     customerId: string;
     branchId: string;
     grandTotal: number;
+    totalPaid?: number;
+    returnedAmount?: number;
+    dueAmount?: number;
     status: "DRAFT" | "POSTED" | "CANCELLED";
     idempotencyKey?: string;
     createdAt: string | Date;
@@ -362,6 +366,7 @@ export interface DirectSaleRequest {
         description?: string;
         quantity: number;
         unitPrice: number;
+        serials?: string[];
     }[];
 }
 export interface DirectSaleResultDto {
@@ -432,6 +437,25 @@ export interface TaxRateDto {
     createdAt?: string | Date;
     updatedAt?: string | Date;
 }
+export interface SubCategoryDto {
+    id: string;
+    name: string;
+    categoryId: string;
+    isActive: boolean;
+    category?: CategoryDto | null;
+    createdAt?: string | Date;
+    updatedAt?: string | Date;
+}
+export interface CreateSubCategoryRequest {
+    name: string;
+    categoryId: string;
+}
+export interface UpdateSubCategoryRequest {
+    name?: string;
+    categoryId?: string;
+    isActive?: boolean;
+}
+export type ProductTrackingType = "SERIALIZED" | "NON_SERIALIZED";
 export interface ProductStockDto {
     warehouseId: string;
     warehouseName: string;
@@ -443,13 +467,18 @@ export interface ProductDto {
     sku: string;
     name: string;
     categoryId?: string | null;
+    subCategoryId?: string | null;
     brandId?: string | null;
     unitId?: string | null;
+    trackingType?: ProductTrackingType;
+    modelNumber?: string | null;
+    barcode?: string | null;
     costPrice: number | string;
     sellingPrice: number | string;
     isServiceItem: boolean;
     isActive: boolean;
     category?: CategoryDto | null;
+    subCategory?: SubCategoryDto | null;
     brand?: BrandDto | null;
     unit?: UnitDto | null;
     totalStock?: number;
@@ -461,8 +490,12 @@ export interface CreateProductRequest {
     sku: string;
     name: string;
     categoryId?: string;
+    subCategoryId?: string;
     brandId?: string;
     unitId?: string;
+    trackingType?: ProductTrackingType;
+    modelNumber?: string;
+    barcode?: string;
     costPrice: string;
     sellingPrice: string;
     isServiceItem?: boolean;
@@ -470,8 +503,12 @@ export interface CreateProductRequest {
 export interface UpdateProductRequest {
     name?: string;
     categoryId?: string | null;
+    subCategoryId?: string | null;
     brandId?: string | null;
     unitId?: string | null;
+    trackingType?: ProductTrackingType;
+    modelNumber?: string | null;
+    barcode?: string | null;
     costPrice?: string;
     sellingPrice?: string;
     isServiceItem?: boolean;
@@ -553,10 +590,16 @@ export interface PurchaseOrderLineDto {
     quantity: number | string;
     unitPrice: number | string;
     lineTotal: number | string;
+    receivedQuantity?: number;
+    remainingQuantity?: number;
+    fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED";
     product?: {
         id: string;
         sku: string;
         name: string;
+        trackingType?: ProductTrackingType;
+        modelNumber?: string;
+        barcode?: string;
     } | null;
 }
 export interface PurchaseOrderDto {
@@ -567,6 +610,10 @@ export interface PurchaseOrderDto {
     branchId: string;
     grandTotal: number | string;
     createdAt: string | Date;
+    fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED";
+    totalOrderedQuantity?: number;
+    totalReceivedQuantity?: number;
+    totalRemainingQuantity?: number;
     supplier?: {
         id: string;
         supplierCode: string;
@@ -586,6 +633,7 @@ export interface PurchaseOrderDto {
         id: string;
         grnNumber: string;
         status: string;
+        receivedAt?: string | Date;
     }[];
 }
 export interface CreatePurchaseOrderRequest {
@@ -610,32 +658,60 @@ export interface GoodsReceiptNoteLineDto {
         sku: string;
         name: string;
     } | null;
+    purchaseOrderLine?: {
+        id: string;
+        quantity: number | string;
+        unitPrice?: number | string;
+    } | null;
 }
 export interface GoodsReceiptNoteDto {
     id: string;
     grnNumber: string;
     purchaseOrderId: string;
-    status: "COMPLETE" | "PARTIAL" | "DISCREPANT";
+    status: "COMPLETE" | "PARTIAL" | "DISCREPANT" | "DRAFT" | "CANCELLED";
     receivedAt: string | Date;
     receivedById: string;
     purchaseOrder?: {
         id: string;
         poNumber: string;
+        branchId?: string;
+        branch?: {
+            id: string;
+            name: string;
+            code: string;
+        };
         supplier?: {
             id: string;
             companyName: string;
         };
+        lines?: {
+            id: string;
+            productId: string;
+            quantity: number | string;
+            unitPrice: number | string;
+            product?: {
+                id: string;
+                sku: string;
+                name: string;
+            };
+        }[];
     };
     lines: GoodsReceiptNoteLineDto[];
 }
 export interface CreateGrnRequest {
     grnNumber?: string;
-    status: "COMPLETE" | "PARTIAL" | "DISCREPANT";
+    warehouseId?: string;
+    status: "COMPLETE" | "PARTIAL" | "DISCREPANT" | "DRAFT";
     lines: {
         purchaseOrderLineId: string;
         productId: string;
         quantityReceived: number | string;
         condition: "GOOD" | "DAMAGED" | "SHORT" | "WRONG_SKU";
+        serials?: Array<string | {
+            serial: string;
+            barcode?: string;
+            notes?: string;
+        }>;
     }[];
 }
 export interface ProcurementStatsDto {
@@ -644,6 +720,12 @@ export interface ProcurementStatsDto {
     pendingPRs: number;
     activeSuppliers: number;
     totalGRNs: number;
+    pendingPOs?: number;
+    partiallyReceivedPOs?: number;
+    fullyReceivedPOs?: number;
+    totalPurchasedQuantity?: number;
+    totalReceivedQuantity?: number;
+    outstandingQuantity?: number;
 }
 export interface StockLedgerDto {
     id: string;
@@ -760,16 +842,46 @@ export interface SKULifecycleEventDto {
     eventType: SKULifecycleStage;
     sourceModule: string;
     sourceId: string;
+    fromWarehouseId?: string | null;
+    toWarehouseId?: string | null;
+    fromStage?: SKULifecycleStage | null;
+    toStage?: SKULifecycleStage | null;
+    notes?: string | null;
+    performedById?: string | null;
     occurredAt: string | Date;
+    fromWarehouse?: {
+        id: string;
+        code: string;
+        name: string;
+    } | null;
+    toWarehouse?: {
+        id: string;
+        code: string;
+        name: string;
+    } | null;
 }
 export interface SerialNumberDto {
     id: string;
     productId: string;
     serial: string;
+    barcode?: string | null;
+    warehouseId?: string | null;
+    purchaseOrderId?: string | null;
+    grnId?: string | null;
+    notes?: string | null;
     currentStage: SKULifecycleStage;
+    createdAt?: string | Date;
+    updatedAt?: string | Date;
     product?: {
         id: string;
         sku: string;
+        name: string;
+        trackingType?: ProductTrackingType;
+        modelNumber?: string | null;
+    } | null;
+    warehouse?: {
+        id: string;
+        code: string;
         name: string;
     } | null;
     events?: SKULifecycleEventDto[];
@@ -777,7 +889,70 @@ export interface SerialNumberDto {
 export interface CreateSerialNumberRequest {
     productId: string;
     serial: string;
+    barcode?: string;
+    warehouseId?: string;
     currentStage?: SKULifecycleStage;
+    notes?: string;
+}
+export type BarcodeScanEntityType = "SERIALIZED_UNIT" | "BULK_PRODUCT";
+export interface BarcodeScanRequest {
+    barcode: string;
+    warehouseId?: string;
+    operationType?: "GRN" | "POS" | "TRANSFER" | "ISSUE" | "RETURN" | "LOOKUP";
+}
+export interface BarcodeScanResultDto {
+    found: boolean;
+    scanType?: BarcodeScanEntityType;
+    scannedCode: string;
+    trackingType?: ProductTrackingType;
+    product: {
+        id: string;
+        sku: string;
+        name: string;
+        trackingType: ProductTrackingType;
+        modelNumber?: string | null;
+        barcode?: string | null;
+        costPrice?: number;
+        sellingPrice?: number;
+        unit?: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
+        category?: {
+            id: string;
+            name: string;
+        } | null;
+    };
+    unit?: {
+        id: string;
+        serial: string;
+        barcode?: string | null;
+        currentStage: SKULifecycleStage;
+        warehouseId?: string | null;
+        warehouseName?: string | null;
+        warehouseCode?: string | null;
+        warehouse?: {
+            id: string;
+            name: string;
+        } | null;
+    } | null;
+    serialNumber?: {
+        id: string;
+        serial: string;
+        barcode?: string | null;
+        currentStage: SKULifecycleStage;
+        warehouseId?: string | null;
+        warehouseName?: string | null;
+        warehouseCode?: string | null;
+        warehouse?: {
+            id: string;
+            name: string;
+        } | null;
+    } | null;
+    availableStockInWarehouse?: number;
+    isValidForOperation: boolean;
+    validationMessage?: string;
 }
 export type DamageLossDisposition = "SCRAP" | "RETURN_TO_STOCK" | "REPAIR" | "RMA" | "WRITE_OFF";
 export type DamageLossStatus = "REPORTED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "DISPOSED";
@@ -841,4 +1016,565 @@ export interface InventoryStatsDto {
     lowStockItemsCount: number;
     activeTransfersCount: number;
     damageLossReportsCount: number;
+}
+export type ChallanReturnCondition = "GOOD" | "DAMAGED" | "FAULTY" | "MISSING_PARTS";
+export interface DeliveryChallanReturnLineDto {
+    id?: string;
+    returnId?: string;
+    challanLineId: string;
+    quantity: number;
+    condition: ChallanReturnCondition;
+    damageLossReportId?: string | null;
+    challanLine?: {
+        id: string;
+        productId: string;
+        quantity: number;
+        product?: {
+            id: string;
+            sku: string;
+            name: string;
+        };
+    };
+}
+export interface DeliveryChallanReturnDto {
+    id: string;
+    returnNumber: string;
+    challanId: string;
+    branchId: string;
+    createdAt: string | Date;
+    challan?: {
+        id: string;
+        challanNumber: string;
+        salesOrderId: string;
+        salesOrder?: {
+            id: string;
+            orderNumber: string;
+            customer?: {
+                displayName: string;
+            };
+        };
+    };
+    branch?: {
+        id: string;
+        code: string;
+        name: string;
+    };
+    lines: DeliveryChallanReturnLineDto[];
+}
+export interface CreateDeliveryChallanReturnRequest {
+    challanId: string;
+    branchId?: string;
+    lines: {
+        challanLineId: string;
+        quantity: number;
+        condition: ChallanReturnCondition;
+    }[];
+}
+export interface SalesOrderFulfillmentLineDto {
+    salesOrderLineId: string;
+    productId: string;
+    sku: string;
+    productName: string;
+    ordered: number;
+    challaned: number;
+    returned: number;
+    netDelivered: number;
+    remaining: number;
+}
+export interface SalesOrderFulfillmentDto {
+    salesOrderId: string;
+    orderNumber: string;
+    lines: SalesOrderFulfillmentLineDto[];
+}
+export interface CreditNoteDto {
+    id: string;
+    creditNoteNumber: string;
+    invoiceId: string;
+    amount: number;
+    reason: string;
+    createdAt: string | Date;
+    invoice?: {
+        id: string;
+        invoiceNumber: string;
+        grandTotal: number;
+        customer?: {
+            displayName: string;
+        };
+    };
+}
+export interface CreateCreditNoteRequest {
+    invoiceId: string;
+    amount: number;
+    reason: string;
+}
+export interface SalesReturnLineDto {
+    id: string;
+    salesReturnId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    serials: string[];
+    product?: {
+        id: string;
+        sku: string;
+        name: string;
+        trackingType: ProductTrackingType;
+        modelNumber?: string | null;
+    };
+}
+export interface SalesReturnDto {
+    id: string;
+    returnNumber: string;
+    invoiceId: string;
+    customerId: string;
+    branchId: string;
+    warehouseId: string;
+    totalAmount: number;
+    creditToWallet: boolean;
+    refundAmount: number;
+    reason?: string | null;
+    status: string;
+    createdAt: string | Date;
+    invoice?: InvoiceDto;
+    customer?: CustomerDto;
+    warehouse?: {
+        id: string;
+        code: string;
+        name: string;
+    };
+    lines: SalesReturnLineDto[];
+}
+export interface CreateSalesReturnRequest {
+    invoiceId: string;
+    warehouseId: string;
+    reason?: string;
+    creditToWallet?: boolean;
+    lines: {
+        productId: string;
+        quantity: number;
+        unitPrice: number;
+        serials?: string[];
+    }[];
+}
+export interface CustomerWalletTransactionDto {
+    id: string;
+    customerId: string;
+    amount: number;
+    type: string;
+    referenceType?: string | null;
+    referenceId?: string | null;
+    balanceAfter: number;
+    notes?: string | null;
+    createdAt: string | Date;
+}
+export interface CustomerFinancialSummaryDto {
+    totalInvoiced: number;
+    totalPaid: number;
+    totalReturned: number;
+    currentDue: number;
+    walletBalance: number;
+}
+export interface CustomerProfileDto {
+    customer: CustomerDto;
+    summary: CustomerFinancialSummaryDto;
+    invoices: InvoiceDto[];
+    salesReturns: SalesReturnDto[];
+    payments: PaymentDto[];
+    walletTransactions: CustomerWalletTransactionDto[];
+}
+export type AdvanceStatus = "RECEIVED" | "PARTIALLY_ADJUSTED" | "FULLY_ADJUSTED" | "REFUNDED";
+export interface AdvanceAdjustmentDto {
+    id: string;
+    advanceId: string;
+    invoiceId: string;
+    amountAdjusted: number;
+    adjustedAt: string | Date;
+    adjustedById: string;
+    invoice?: {
+        id: string;
+        invoiceNumber: string;
+        grandTotal: number;
+    };
+    advance?: {
+        id: string;
+        amount: number;
+        status: AdvanceStatus;
+    };
+}
+export interface CustomerAdvanceDto {
+    id: string;
+    customerId: string;
+    projectRef?: string | null;
+    amount: number;
+    receivedDate: string | Date;
+    method: string;
+    status: AdvanceStatus;
+    branchId: string;
+    receivedById: string;
+    createdAt: string | Date;
+    adjustedAmount?: number;
+    remainingAmount?: number;
+    customer?: {
+        id: string;
+        customerCode: string;
+        displayName: string;
+        phone?: string;
+    };
+    branch?: {
+        id: string;
+        code: string;
+        name: string;
+    };
+    adjustments?: AdvanceAdjustmentDto[];
+}
+export interface CreateCustomerAdvanceRequest {
+    customerId: string;
+    projectRef?: string;
+    amount: number;
+    receivedDate?: string | Date;
+    method: string;
+    branchId: string;
+    receivedById?: string;
+    bankProof?: {
+        accountNumberLast4: string;
+        proofFileId: string;
+    };
+}
+export interface AdjustAdvanceRequest {
+    advanceId: string;
+    invoiceId: string;
+    amountAdjusted: number;
+    adjustedById?: string;
+}
+export interface PaymentDto {
+    id: string;
+    invoiceId: string;
+    amount: number;
+    method: string;
+    gatewayTransactionId?: string | null;
+    receivedAt: string | Date;
+    invoice?: {
+        id: string;
+        invoiceNumber: string;
+        grandTotal: number;
+        customerId: string;
+        customer?: {
+            displayName: string;
+        };
+    };
+}
+export interface RecordPaymentRequest {
+    invoiceId: string;
+    amount: number;
+    method: string;
+    gatewayTransactionId?: string;
+    bankProof?: {
+        accountNumberLast4: string;
+        proofFileId: string;
+    };
+}
+export interface BankTransactionProofDto {
+    id: string;
+    sourceModule: string;
+    sourceId: string;
+    accountNumberMasked: string;
+    proofFileId: string;
+    uploadedById: string;
+    uploadedAt: string | Date;
+}
+export interface CreateBankProofRequest {
+    sourceModule: string;
+    sourceId: string;
+    accountNumberLast4: string;
+    proofFileId: string;
+    uploadedById?: string;
+}
+export type TicketType = "WARRANTY_CLAIM" | "PAID_SERVICE_REQUEST";
+export type TicketStatus = "OPEN" | "QUOTE_PENDING" | "QUOTE_ACCEPTED" | "ASSIGNED" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type AssignmentStatus = "ASSIGNED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "VERIFIED" | "CUSTOMER_ACCEPTED" | "CLOSED" | "CANCELLED";
+export type CustodyStatus = "ASSIGNED" | "USED" | "RETURNED" | "DAMAGED" | "LOST" | "SOLD_TO_CUSTOMER";
+export type WarrantyStatus = "ACTIVE" | "EXPIRED" | "VOIDED";
+export type WarrantyClaimOutcome = "REPLACED" | "REPAIRED" | "REJECTED";
+export type ConveyanceApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+export interface TicketDto {
+    id: string;
+    ticketNumber: string;
+    ticketType: TicketType;
+    customerId: string;
+    branchId: string;
+    serialNumberId?: string | null;
+    description: string;
+    status: TicketStatus;
+    serviceAssignmentId?: string | null;
+    createdAt: string | Date;
+    closedAt?: string | Date | null;
+    customer?: {
+        id: string;
+        customerCode: string;
+        displayName: string;
+        phone?: string;
+    };
+    branch?: {
+        id: string;
+        code: string;
+        name: string;
+    };
+    serialNumber?: {
+        id: string;
+        serialNumber: string;
+        product?: {
+            id: string;
+            name: string;
+            sku: string;
+        };
+    } | null;
+    serviceQuotation?: QuotationDto | null;
+    serviceAssignment?: {
+        id: string;
+        assignmentNumber: string;
+        status: AssignmentStatus;
+    } | null;
+    warrantyClaims?: WarrantyClaimDto[];
+}
+export interface CreateTicketRequest {
+    ticketType: TicketType;
+    customerId: string;
+    branchId: string;
+    serialNumberId?: string;
+    description: string;
+}
+export interface CreateServiceQuotationRequest {
+    ticketId: string;
+    customerId?: string;
+    branchId?: string;
+    lines: Array<{
+        productId?: string;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+    }>;
+}
+export interface TechnicianAssignmentDto {
+    id: string;
+    assignmentId: string;
+    employeeId: string;
+    assignedAt: string | Date;
+    unassignedAt?: string | Date | null;
+    technician?: {
+        id: string;
+        employeeCode: string;
+        firstName: string;
+        lastName: string;
+        phone?: string;
+    };
+}
+export interface ProductCustodyDto {
+    id: string;
+    assignmentId: string;
+    serialNumberId?: string | null;
+    productId: string;
+    quantity: number;
+    status: CustodyStatus;
+    custodianId: string;
+    createdAt: string | Date;
+    product?: {
+        id: string;
+        sku: string;
+        name: string;
+    };
+    serialNumber?: {
+        id: string;
+        serialNumber: string;
+    } | null;
+    custodian?: {
+        id: string;
+        employeeCode: string;
+        firstName: string;
+        lastName: string;
+    };
+}
+export interface TechnicianAdvanceDto {
+    id: string;
+    assignmentId: string;
+    employeeId: string;
+    amountIssued: number;
+    issuedAt: string | Date;
+    technician?: {
+        id: string;
+        employeeCode: string;
+        firstName: string;
+        lastName: string;
+    };
+}
+export interface ConveyanceBillDto {
+    id: string;
+    assignmentId: string;
+    employeeId: string;
+    totalClaimed: number;
+    approvalStatus: ConveyanceApprovalStatus;
+    receiptFileId?: string | null;
+    submittedAt: string | Date;
+    technician?: {
+        id: string;
+        employeeCode: string;
+        firstName: string;
+        lastName: string;
+    };
+}
+export interface ProjectClosureReportDto {
+    id: string;
+    assignmentId: string;
+    customerSignatureFileId?: string | null;
+    closedAt?: string | Date | null;
+    closedById: string;
+    closedBy?: {
+        id: string;
+        email: string;
+    };
+}
+export interface LiveLocationLogDto {
+    id: string;
+    employeeId: string;
+    assignmentId?: string | null;
+    latitude: number;
+    longitude: number;
+    recordedAt: string | Date;
+    employee?: {
+        id: string;
+        employeeCode: string;
+        firstName: string;
+        lastName: string;
+    };
+}
+export interface ServiceAssignmentDto {
+    id: string;
+    assignmentNumber: string;
+    sourceType: "SALES_ORDER" | "INVOICE" | "TICKET";
+    sourceId: string;
+    branchId: string;
+    status: AssignmentStatus;
+    version: number;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+    branch?: {
+        id: string;
+        code: string;
+        name: string;
+    };
+    technicians: TechnicianAssignmentDto[];
+    custody: ProductCustodyDto[];
+    advances: TechnicianAdvanceDto[];
+    conveyance: ConveyanceBillDto[];
+    closure?: ProjectClosureReportDto | null;
+    liveLocationLogs?: LiveLocationLogDto[];
+    ticket?: {
+        id: string;
+        ticketNumber: string;
+        description: string;
+        ticketType: TicketType;
+    } | null;
+}
+export interface CreateServiceAssignmentRequest {
+    sourceType: "SALES_ORDER" | "INVOICE" | "TICKET";
+    sourceId: string;
+    branchId: string;
+    initialTechnicianId?: string;
+}
+export interface AssignTechnicianRequest {
+    assignmentId: string;
+    employeeId: string;
+}
+export interface IssueProductCustodyRequest {
+    assignmentId: string;
+    productId: string;
+    serialNumberId?: string;
+    quantity: number;
+    custodianId: string;
+}
+export interface UpdateCustodyStatusRequest {
+    custodyId: string;
+    status: CustodyStatus;
+}
+export interface IssueTechnicianAdvanceRequest {
+    assignmentId: string;
+    employeeId: string;
+    amountIssued: number;
+}
+export interface SubmitConveyanceBillRequest {
+    assignmentId: string;
+    employeeId: string;
+    totalClaimed: number;
+    receiptFileId?: string;
+}
+export interface CloseServiceAssignmentRequest {
+    assignmentId: string;
+    customerSignatureFileId?: string;
+    notes?: string;
+}
+export interface RecordLocationLogRequest {
+    employeeId: string;
+    assignmentId?: string;
+    latitude: number;
+    longitude: number;
+    recordedAt?: string | Date;
+}
+export interface WarrantyDto {
+    id: string;
+    serialNumberId: string;
+    startDate: string | Date;
+    endDate: string | Date;
+    termMonths: number;
+    status: WarrantyStatus;
+    createdAt: string | Date;
+    serialNumber?: {
+        id: string;
+        serialNumber: string;
+        product?: {
+            id: string;
+            name: string;
+            sku: string;
+        };
+    };
+    claims?: WarrantyClaimDto[];
+}
+export interface CreateWarrantyRequest {
+    serialNumberId: string;
+    startDate: string | Date;
+    termMonths: number;
+}
+export interface WarrantyClaimDto {
+    id: string;
+    warrantyId: string;
+    ticketId: string;
+    outcome?: WarrantyClaimOutcome | null;
+    raisedAt: string | Date;
+    resolvedAt?: string | Date | null;
+    warranty?: WarrantyDto;
+    ticket?: TicketDto;
+}
+export interface CreateWarrantyClaimRequest {
+    warrantyId: string;
+    ticketId: string;
+    outcome?: WarrantyClaimOutcome;
+}
+export interface ServicePnlDto {
+    assignmentId: string;
+    assignmentNumber: string;
+    label: "INTERIM" | "FINAL";
+    revenue: number;
+    materialCost: number;
+    technicianAdvances: number;
+    conveyanceExpense: number;
+    netProfit: number;
+    marginPercentage: number;
+}
+export interface ServiceStatsDto {
+    totalTickets: number;
+    openTickets: number;
+    activeAssignments: number;
+    inProgressAssignments: number;
+    closedAssignments: number;
+    pendingConveyanceBills: number;
+    activeWarranties: number;
 }

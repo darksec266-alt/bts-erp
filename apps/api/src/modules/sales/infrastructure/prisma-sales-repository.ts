@@ -48,6 +48,9 @@ export interface SalesPrismaClient {
   sKULifecycleEvent?: AnyPrisma;
   customer?: AnyPrisma;
   branch?: AnyPrisma;
+  salesReturn?: AnyPrisma;
+  salesReturnLine?: AnyPrisma;
+  customerWalletTransaction?: AnyPrisma;
   $transaction?: <T>(fn: (tx: AnyPrisma) => Promise<T>) => Promise<T>;
 }
 
@@ -76,13 +79,13 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       data.quotationNumber ||
       `QT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const computedLines = data.lines.map((line: { productId?: string | null; description: string; quantity: number; unitPrice: number }) => {
+    const computedLines = data.lines.map((line: { productId?: string | null; description?: string; quantity: number; unitPrice: number }) => {
       const qty = Number(line.quantity);
       const price = Number(line.unitPrice);
       const total = Number((qty * price).toFixed(2));
       return {
         productId: line.productId || null,
-        description: line.description,
+        description: line.description || "",
         quantity: qty,
         unitPrice: price,
         lineTotal: total,
@@ -216,13 +219,13 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       data.orderNumber ||
       `SO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const computedLines = data.lines.map((line: { productId?: string | null; description: string; quantity: number; unitPrice: number }) => {
+    const computedLines = data.lines.map((line: { productId?: string | null; description?: string; quantity: number; unitPrice: number }) => {
       const qty = Number(line.quantity);
       const price = Number(line.unitPrice);
       const total = Number((qty * price).toFixed(2));
       return {
         productId: line.productId || null,
-        description: line.description,
+        description: line.description || "",
         quantity: qty,
         unitPrice: price,
         lineTotal: total,
@@ -2877,6 +2880,7 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       id: row.id,
       returnNumber: row.returnNumber,
       invoiceId: row.invoiceId,
+      invoiceNumber: row.invoice?.invoiceNumber,
       customerId: row.customerId,
       branchId: row.branchId,
       warehouseId: row.warehouseId,
@@ -2986,8 +2990,8 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
 
       return {
         productId: line.productId || "",
-        productName: line.productName,
-        sku: line.sku,
+        productName: line.productName || "Product",
+        sku: line.sku || "",
         trackingType: (candidateSerials.length > 0 ? "SERIALIZED" : "NON_SERIALIZED") as "SERIALIZED" | "NON_SERIALIZED",
         invoicedQuantity: line.quantity,
         alreadyReturnedQuantity: alreadyReturned,
@@ -3003,9 +3007,9 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       const prods = await this.prisma.product.findMany({
         where: { id: { in: productIds } },
       });
-      const prodMap = new Map(prods.map((p) => [p.id, p]));
+      const prodMap = new Map((prods as any[]).map((p: any) => [p.id, p]));
       for (const item of items) {
-        const p = prodMap.get(item.productId);
+        const p: any = prodMap.get(item.productId);
         if (p) {
           item.trackingType = (p.trackingType as any) || "NON_SERIALIZED";
         }
@@ -3094,7 +3098,7 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
     totalAmount = Number(totalAmount.toFixed(2));
     const returnNumber = `RET-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const row = await this.prisma.$transaction(async (tx) => {
+    const row = await (this.prisma as any).$transaction(async (tx: any) => {
       // 1. Create SalesReturn record
       const createdReturn = await tx.salesReturn.create({
         data: {
@@ -3263,7 +3267,7 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
     ]);
 
     return {
-      items: rows.map((r) => this.mapSalesReturn(r)),
+      items: rows.map((r: any) => this.mapSalesReturn(r)),
       total,
     };
   }

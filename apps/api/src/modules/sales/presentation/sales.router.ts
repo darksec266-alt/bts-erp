@@ -37,6 +37,10 @@ import type {
   ListPaymentsUseCase,
   CreateBankTransactionProofUseCase,
   GetBankTransactionProofUseCase,
+  CreateSalesReturnUseCase,
+  GetSalesReturnUseCase,
+  ListSalesReturnsUseCase,
+  GetInvoiceReturnableItemsUseCase,
 } from "../application/sales.use-cases";
 import {
   QuotationNotFoundError,
@@ -82,6 +86,10 @@ export interface SalesRouterDependencies {
   listPaymentsUseCase: ListPaymentsUseCase;
   createBankTransactionProofUseCase: CreateBankTransactionProofUseCase;
   getBankTransactionProofUseCase: GetBankTransactionProofUseCase;
+  createSalesReturnUseCase?: CreateSalesReturnUseCase;
+  getSalesReturnUseCase?: GetSalesReturnUseCase;
+  listSalesReturnsUseCase?: ListSalesReturnsUseCase;
+  getInvoiceReturnableItemsUseCase?: GetInvoiceReturnableItemsUseCase;
 }
 
 export function createSalesRouter(deps: SalesRouterDependencies): Router {
@@ -406,21 +414,28 @@ export function createSalesRouter(deps: SalesRouterDependencies): Router {
     "/sales/invoices",
     requirePermission("sales.view", "sales.manage"),
     async (req: Request, res: Response) => {
-      const { branchId, customerId, salesOrderId, status, search, skip, take } = req.query;
-      const result = await deps.listInvoicesUseCase.execute(
-        {
-          branchId: typeof branchId === "string" ? branchId : undefined,
-          customerId: typeof customerId === "string" ? customerId : undefined,
-          salesOrderId: typeof salesOrderId === "string" ? salesOrderId : undefined,
-          status: typeof status === "string" ? status : undefined,
-          search: typeof search === "string" ? search : undefined,
-        },
-        {
-          skip: Number(skip) || 0,
-          take: Math.min(Number(take) || 20, 100),
-        }
-      );
-      sendData(res, result);
+      try {
+        const { branchId, customerId, salesOrderId, status, search, skip, take } = req.query;
+        const result = await deps.listInvoicesUseCase.execute(
+          {
+            branchId: typeof branchId === "string" ? branchId : undefined,
+            customerId: typeof customerId === "string" ? customerId : undefined,
+            salesOrderId: typeof salesOrderId === "string" ? salesOrderId : undefined,
+            status: typeof status === "string" ? status : undefined,
+            search: typeof search === "string" ? search : undefined,
+          },
+          {
+            skip: Number(skip) || 0,
+            take: Math.min(Number(take) || 20, 100),
+          }
+        );
+        sendData(res, result);
+      } catch (err) {
+        sendError(res, 500, {
+          code: "LIST_INVOICES_FAILED",
+          message: err instanceof Error ? err.message : "Failed to list invoices.",
+        });
+      }
     }
   );
 
@@ -928,6 +943,102 @@ export function createSalesRouter(deps: SalesRouterDependencies): Router {
         sendError(res, 400, {
           code: "BANK_PROOF_FETCH_FAILED",
           message: err instanceof Error ? err.message : "Failed to fetch bank proof.",
+        });
+      }
+    }
+  );
+
+  // -------------------------------------------------------------
+  // Sales Returns & Inventory Restorations
+  // -------------------------------------------------------------
+  router.get(
+    "/sales/invoices/:id/returnable-items",
+    requirePermission("sales.view", "sales.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!deps.getInvoiceReturnableItemsUseCase) {
+          sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Not configured." });
+          return;
+        }
+        const result = await deps.getInvoiceReturnableItemsUseCase.execute(req.params.id!);
+        sendData(res, result);
+      } catch (err) {
+        sendError(res, 400, {
+          code: "GET_RETURNABLE_ITEMS_FAILED",
+          message: err instanceof Error ? err.message : "Failed to load returnable items.",
+        });
+      }
+    }
+  );
+
+  router.post(
+    "/sales/returns",
+    requirePermission("sales.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!deps.createSalesReturnUseCase) {
+          sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Not configured." });
+          return;
+        }
+        const userId = req.user?.sub;
+        const result = await deps.createSalesReturnUseCase.execute(req.body, userId);
+        sendData(res, result, 201);
+      } catch (err) {
+        sendError(res, 400, {
+          code: "CREATE_SALES_RETURN_FAILED",
+          message: err instanceof Error ? err.message : "Failed to create sales return.",
+        });
+      }
+    }
+  );
+
+  router.get(
+    "/sales/returns",
+    requirePermission("sales.view", "sales.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!deps.listSalesReturnsUseCase) {
+          sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Not configured." });
+          return;
+        }
+        const { invoiceId, customerId, branchId, skip, take } = req.query;
+        const result = await deps.listSalesReturnsUseCase.execute(
+          {
+            invoiceId: typeof invoiceId === "string" ? invoiceId : undefined,
+            customerId: typeof customerId === "string" ? customerId : undefined,
+            branchId: typeof branchId === "string" ? branchId : undefined,
+          },
+          { skip: Number(skip) || 0, take: Number(take) || 50 }
+        );
+        sendData(res, result);
+      } catch (err) {
+        sendError(res, 400, {
+          code: "LIST_SALES_RETURNS_FAILED",
+          message: err instanceof Error ? err.message : "Failed to list sales returns.",
+        });
+      }
+    }
+  );
+
+  router.get(
+    "/sales/returns/:id",
+    requirePermission("sales.view", "sales.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!deps.getSalesReturnUseCase) {
+          sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Not configured." });
+          return;
+        }
+        const result = await deps.getSalesReturnUseCase.execute(req.params.id!);
+        if (!result) {
+          sendError(res, 404, { code: "NOT_FOUND", message: "Sales return not found." });
+          return;
+        }
+        sendData(res, result);
+      } catch (err) {
+        sendError(res, 400, {
+          code: "GET_SALES_RETURN_FAILED",
+          message: err instanceof Error ? err.message : "Failed to get sales return.",
         });
       }
     }

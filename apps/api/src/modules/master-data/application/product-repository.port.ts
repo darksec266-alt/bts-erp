@@ -30,6 +30,8 @@ export interface ProductRecord {
   unit?: { id: string; code: string; name: string } | null;
   totalStock?: number;
   stockLedgers?: ProductStockRecord[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface CreateProductInput {
@@ -76,6 +78,7 @@ export interface ProductRepository {
   create(input: CreateProductInput): Promise<ProductRecord>;
   findById(id: string): Promise<ProductRecord | null>;
   findBySku(sku: string): Promise<ProductRecord | null>;
+  findByBarcode(barcode: string): Promise<ProductRecord | null>;
   list(filter: ProductListFilter, page: { skip: number; take: number }): Promise<{ items: ProductRecord[]; total: number }>;
   update(id: string, input: UpdateProductInput): Promise<ProductRecord>;
   delete(id: string): Promise<void>; // throws EntityInUseError if referenced elsewhere

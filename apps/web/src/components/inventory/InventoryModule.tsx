@@ -123,7 +123,7 @@ export const InventoryModule: React.FC = () => {
     Promise.all([
       api.getWarehouses({ take: 100 }),
       api.getBranches(),
-      api.getProducts({ take: 200 }),
+      api.getProducts({ take: 300 }),
     ])
       .then(([whRes, brRes, prodRes]) => {
         setWarehouses(whRes.items);

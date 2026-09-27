@@ -35,11 +35,12 @@ import { createGrnRouter } from "./modules/procurement/presentation/grn.router";
 import { createPurchaseInvoiceRouter } from "./modules/procurement/presentation/purchase-invoice.router";
 import { createSupplierPaymentRouter } from "./modules/procurement/presentation/supplier-payment.router";
 import { createPurchaseReturnRouter } from "./modules/procurement/presentation/purchase-return.router";
+import { createProcurementStatsRouter } from "./modules/procurement/presentation/procurement-stats.router";
 import { createApprovalRouter } from "./shared/approval/approval.router";
 import type { ApprovalService } from "./shared/approval/approval.service";
 import type { CreateSupplierUseCase, GetSupplierUseCase, ListSuppliersUseCase, UpdateSupplierUseCase, AddSupplierContactUseCase, DeleteSupplierUseCase } from "./modules/procurement/application/supplier.use-cases";
-import type { CreatePurchaseRequestUseCase, GetPurchaseRequestUseCase, ListPurchaseRequestsUseCase, ApprovePurchaseRequestUseCase, RejectPurchaseRequestUseCase } from "./modules/procurement/application/purchase-request.use-cases";
-import type { CreatePurchaseOrderUseCase, GetPurchaseOrderUseCase, ListPurchaseOrdersUseCase } from "./modules/procurement/application/purchase-order.use-cases";
+import type { CreatePurchaseRequestUseCase, GetPurchaseRequestUseCase, ListPurchaseRequestsUseCase, ApprovePurchaseRequestUseCase, RejectPurchaseRequestUseCase, CancelPurchaseRequestUseCase } from "./modules/procurement/application/purchase-request.use-cases";
+import type { CreatePurchaseOrderUseCase, GetPurchaseOrderUseCase, ListPurchaseOrdersUseCase, CancelPurchaseOrderUseCase } from "./modules/procurement/application/purchase-order.use-cases";
 import type { ReceiveGoodsUseCase, GetGrnUseCase, ListGrnsUseCase, ApproveGrnDiscrepancyUseCase, UpdateGrnStatusUseCase } from "./modules/procurement/application/grn.use-cases";
 import type { CreatePurchaseInvoiceUseCase, GetPurchaseInvoiceUseCase } from "./modules/procurement/application/purchase-invoice.use-cases";
 import type { RecordSupplierPaymentUseCase } from "./modules/procurement/application/supplier-payment.use-case";
@@ -108,6 +109,7 @@ export interface AppDependencies {
   procurement?: {
     tokenService: TokenService;
     approvalService: ApprovalService; // shared/approval — also reusable by any future module before Phase 9
+    prisma?: any;
     supplier: {
       createSupplierUseCase: CreateSupplierUseCase;
       getSupplierUseCase: GetSupplierUseCase;
@@ -122,11 +124,13 @@ export interface AppDependencies {
       listPurchaseRequestsUseCase: ListPurchaseRequestsUseCase;
       approvePurchaseRequestUseCase: ApprovePurchaseRequestUseCase;
       rejectPurchaseRequestUseCase: RejectPurchaseRequestUseCase;
+      cancelPurchaseRequestUseCase?: CancelPurchaseRequestUseCase;
     };
     purchaseOrder: {
       createPurchaseOrderUseCase: CreatePurchaseOrderUseCase;
       getPurchaseOrderUseCase: GetPurchaseOrderUseCase;
       listPurchaseOrdersUseCase: ListPurchaseOrdersUseCase;
+      cancelPurchaseOrderUseCase?: CancelPurchaseOrderUseCase;
     };
     grn: {
       receiveGoodsUseCase: ReceiveGoodsUseCase;
@@ -223,7 +227,8 @@ export function createApp(deps: AppDependencies = {}): Express {
       createPurchaseInvoiceRouter(pc.purchaseInvoice),
       createSupplierPaymentRouter(pc.supplierPayment),
       createPurchaseReturnRouter(pc.purchaseReturn),
-      createApprovalRouter(pc.approvalService)
+      createApprovalRouter(pc.approvalService),
+      ...(pc.prisma ? [createProcurementStatsRouter(pc.prisma)] : [])
     );
   }
 

@@ -12,6 +12,7 @@ function makeRepo(overrides: Partial<jest.Mocked<ProductRepository>> = {}): jest
     create: jest.fn().mockResolvedValue(sampleProduct),
     findById: jest.fn().mockResolvedValue(sampleProduct),
     findBySku: jest.fn().mockResolvedValue(null),
+    findByBarcode: jest.fn().mockResolvedValue(null),
     list: jest.fn().mockResolvedValue({ items: [sampleProduct], total: 1 }),
     update: jest.fn().mockResolvedValue({ ...sampleProduct, sellingPrice: "5500.00" }),
     delete: jest.fn().mockResolvedValue(undefined),

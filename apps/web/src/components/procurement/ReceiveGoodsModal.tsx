@@ -16,6 +16,9 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  Upload,
+  FileText,
+  Download,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import type { PurchaseOrderDto, GoodsReceiptNoteDto, ProductTrackingType } from "@bts/shared-types";
@@ -43,7 +46,7 @@ interface GRNLineForm {
   quantityReceived: number;
   condition: "GOOD" | "DAMAGED" | "SHORT" | "WRONG_SKU";
   serials: string[];
-  scanMode: "SCAN" | "PASTE";
+  scanMode: "SCAN" | "PASTE" | "UPLOAD";
   scanInput: string;
   pasteInput: string;
   isExpanded: boolean;
@@ -151,8 +154,8 @@ export const ReceiveGoodsModal: React.FC<ReceiveGoodsModalProps> = ({
     });
   };
 
-  // Toggle scan mode (SCAN vs PASTE)
-  const handleSetScanMode = (idx: number, mode: "SCAN" | "PASTE") => {
+  // Toggle scan mode (SCAN vs PASTE vs UPLOAD)
+  const handleSetScanMode = (idx: number, mode: "SCAN" | "PASTE" | "UPLOAD") => {
     setLines((prev) => {
       const next = [...prev];
       next[idx] = { ...next[idx], scanMode: mode };
@@ -189,35 +192,29 @@ export const ReceiveGoodsModal: React.FC<ReceiveGoodsModalProps> = ({
     });
   };
 
-  // Import bulk pasted serials
-  const handleImportPastedSerials = (idx: number) => {
+  // Helper to ingest an array of raw serial tokens
+  const ingestSerialTokens = (idx: number, tokens: string[], sourceLabel: string) => {
     setLines((prev) => {
       const next = [...prev];
       const target = { ...next[idx] };
-      const raw = target.pasteInput.trim();
-      if (!raw) return prev;
-
-      const tokens = raw
-        .split(/[\r\n,;\t]+/)
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
-
       const existingUpper = new Set(target.serials.map((s) => s.toUpperCase()));
       const toAdd: string[] = [];
       const duplicates: string[] = [];
 
       for (const token of tokens) {
-        const u = token.toUpperCase();
+        const cleaned = token.trim();
+        if (!cleaned) continue;
+        const u = cleaned.toUpperCase();
         if (existingUpper.has(u)) {
-          duplicates.push(token);
+          duplicates.push(cleaned);
         } else {
           existingUpper.add(u);
-          toAdd.push(token);
+          toAdd.push(cleaned);
         }
       }
 
       if (toAdd.length === 0) {
-        setError("No new unique serials found to import.");
+        setError(`No new unique serials found to import from ${sourceLabel}.`);
         return prev;
       }
 
@@ -232,14 +229,88 @@ export const ReceiveGoodsModal: React.FC<ReceiveGoodsModalProps> = ({
       target.serials = newSerials;
       target.quantityReceived = newSerials.length;
       target.pasteInput = "";
-      if (duplicates.length > 0) {
-        setError(`Imported ${added.length} serials. Skipped ${duplicates.length} duplicates.`);
-      } else {
-        setError(null);
+      
+      let msg = `Successfully loaded ${added.length} serials from ${sourceLabel}.`;
+      if (toAdd.length > availableSlots) {
+        msg += ` (${toAdd.length - availableSlots} items exceeded remaining due of ${target.remainingDue} and were omitted)`;
       }
+      if (duplicates.length > 0) {
+        msg += ` Skipped ${duplicates.length} duplicate(s).`;
+      }
+      setError(msg);
       next[idx] = target;
       return next;
     });
+  };
+
+  // Import bulk pasted serials
+  const handleImportPastedSerials = (idx: number) => {
+    const target = lines[idx];
+    if (!target) return;
+    const raw = target.pasteInput.trim();
+    if (!raw) return;
+
+    const tokens = raw
+      .split(/[\r\n,;\t]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    ingestSerialTokens(idx, tokens, "pasted input");
+  };
+
+  // Handle CSV/TXT File Upload for Serials
+  const handleFileUpload = (idx: number, file: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = (e.target?.result as string) || "";
+        const rawLines = text.split(/[\r\n]+/).map((l) => l.trim()).filter((l) => l.length > 0);
+        if (rawLines.length === 0) {
+          setError(`File "${file.name}" is empty.`);
+          return;
+        }
+
+        let serialsToProcess: string[] = [];
+        const firstLine = rawLines[0].toLowerCase();
+        const delimiter = firstLine.includes("\t") ? "\t" : firstLine.includes(";") ? ";" : firstLine.includes(",") ? "," : null;
+
+        if (delimiter) {
+          const headers = rawLines[0].split(delimiter).map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
+          const targetColIdx = headers.findIndex((h) =>
+            h === "serial" || h === "serial_number" || h === "serialnumber" || h === "sn" || h === "barcode" || h === "imei" || h.includes("serial")
+          );
+          const startRow = targetColIdx !== -1 ? 1 : 0;
+          const colToUse = targetColIdx !== -1 ? targetColIdx : 0;
+
+          for (let i = startRow; i < rawLines.length; i++) {
+            const cols = rawLines[i].split(delimiter);
+            const val = cols[colToUse]?.trim().replace(/^['"]+|['"]+$/g, "");
+            if (val) serialsToProcess.push(val);
+          }
+        } else {
+          serialsToProcess = rawLines.map((l) => l.trim().replace(/^['"]+|['"]+$/g, "")).filter(Boolean);
+        }
+
+        ingestSerialTokens(idx, serialsToProcess, file.name);
+      } catch (err) {
+        setError(`Failed to read file: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Download Sample CSV template for Serials
+  const handleDownloadSampleCsv = (sku: string) => {
+    const csvContent = "serial_number\n" + `${sku}-SN-001\n${sku}-SN-002\n${sku}-SN-003\n`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `sample_serials_${sku || "item"}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Remove a captured serial
@@ -808,6 +879,18 @@ export const ReceiveGoodsModal: React.FC<ReceiveGoodsModalProps> = ({
                                         <Clipboard className="w-3 h-3" />
                                         <span>Bulk Paste</span>
                                       </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetScanMode(idx, "UPLOAD")}
+                                        className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-colors ${
+                                          line.scanMode === "UPLOAD"
+                                            ? "bg-surface font-semibold text-ink shadow-xs"
+                                            : "text-text-muted hover:text-ink"
+                                        }`}
+                                      >
+                                        <Upload className="w-3 h-3 text-purple" />
+                                        <span>Upload File (CSV/Excel)</span>
+                                      </button>
                                     </div>
 
                                     <button
@@ -869,7 +952,7 @@ export const ReceiveGoodsModal: React.FC<ReceiveGoodsModalProps> = ({
                                       <span>Add Serial</span>
                                     </button>
                                   </div>
-                                ) : (
+                                ) : line.scanMode === "PASTE" ? (
                                   <div className="space-y-1.5">
                                     <textarea
                                       rows={2}
@@ -894,6 +977,52 @@ export const ReceiveGoodsModal: React.FC<ReceiveGoodsModalProps> = ({
                                         <Clipboard className="w-3.5 h-3.5" />
                                         <span>Import Pasted Serials</span>
                                       </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="p-3 border border-dashed border-purple/30 rounded-md bg-purple/5 space-y-2">
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <FileText className="w-5 h-5 text-purple" />
+                                        <div>
+                                          <p className="text-caption font-semibold text-ink">Upload Serial Numbers File (.csv, .txt, .tsv)</p>
+                                          <p className="text-[11px] text-text-muted">Upload supplier serials list. Header column &quot;serial_number&quot; or single-column lists supported.</p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadSampleCsv(line.productSku)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-purple border border-purple/30 bg-surface rounded hover:bg-purple/10 transition-colors"
+                                        title="Download template"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        <span>Sample Template</span>
+                                      </button>
+                                    </div>
+                                    <div className="flex items-center gap-2 pt-1">
+                                      <input
+                                        type="file"
+                                        accept=".csv,.txt,.tsv"
+                                        id={`serial-file-upload-${idx}`}
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            handleFileUpload(idx, file);
+                                            e.target.value = "";
+                                          }
+                                        }}
+                                      />
+                                      <label
+                                        htmlFor={`serial-file-upload-${idx}`}
+                                        className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple text-white rounded-sm text-caption font-semibold hover:bg-purple/90 transition-colors shadow-xs"
+                                      >
+                                        <Upload className="w-3.5 h-3.5" />
+                                        <span>Choose CSV / TXT File</span>
+                                      </label>
+                                      <span className="text-[11px] text-text-muted">
+                                        Remaining needed: <strong>{Math.max(0, line.remainingDue - line.serials.length)}</strong> serial(s)
+                                      </span>
                                     </div>
                                   </div>
                                 )}

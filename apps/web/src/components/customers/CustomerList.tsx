@@ -165,6 +165,9 @@ export const CustomerList: React.FC<CustomerListProps> = ({ selectedBranchId }) 
 
   const handleCustomerCreated = (newCust: CustomerDto) => {
     addToast("success", `Customer ${newCust.displayName} registered successfully.`);
+    setCustomers((prev) => [newCust, ...prev.filter((c) => c.id !== newCust.id)]);
+    setTotalCount((prev) => prev + 1);
+    setPage(1);
     fetchCustomers();
   };
 
@@ -436,6 +439,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({ selectedBranchId }) 
                   <th className="py-3 px-4">Account Type</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Addresses</th>
+                  <th className="py-3 px-4 text-right">Wallet Balance</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -518,15 +522,21 @@ export const CustomerList: React.FC<CustomerListProps> = ({ selectedBranchId }) 
                         )}
                       </td>
 
+                      {/* Wallet Balance */}
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-600">
+                        ৳{Number(c.walletBalance || 0).toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                      </td>
+
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => handleOpenDetail(c)}
-                            title="View Full Details"
-                            className="p-1.5 rounded text-text-muted hover:text-primary hover:bg-primary-tint transition-colors"
+                            title="Open Customer Profile & Ledger"
+                            className="px-2.5 py-1 text-caption font-semibold rounded bg-primary-tint text-primary hover:bg-primary hover:text-white transition-colors flex items-center gap-1 shadow-xs"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Profile</span>
                           </button>
                           <button
                             onClick={() => {

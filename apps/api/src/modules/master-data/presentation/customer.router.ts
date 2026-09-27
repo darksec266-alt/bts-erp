@@ -2,7 +2,18 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { sendData, sendError } from "../../../shared/http";
 import { requirePermission } from "../../../shared/security/require-permission.middleware";
-import { CreateCustomerUseCase, DuplicatePhoneError, GetCustomerUseCase, ListCustomersUseCase, UpdateCustomerUseCase, AddCustomerAddressUseCase, DeleteCustomerUseCase } from "../application/customer.use-cases";
+import {
+  CreateCustomerUseCase,
+  DuplicatePhoneError,
+  GetCustomerUseCase,
+  ListCustomersUseCase,
+  UpdateCustomerUseCase,
+  AddCustomerAddressUseCase,
+  DeleteCustomerUseCase,
+  GetCustomerProfileUseCase,
+  TopupCustomerWalletUseCase,
+  PayInvoiceFromWalletUseCase,
+} from "../application/customer.use-cases";
 import { SimpleMasterDataNotFoundError, EntityInUseError } from "../domain/simple-master-data.types";
 
 function isPrismaUniqueConstraint(err: unknown): boolean {
@@ -19,6 +30,9 @@ export function createCustomerRouter(deps: {
   updateCustomerUseCase: UpdateCustomerUseCase;
   addCustomerAddressUseCase: AddCustomerAddressUseCase;
   deleteCustomerUseCase: DeleteCustomerUseCase;
+  getCustomerProfileUseCase?: GetCustomerProfileUseCase;
+  topupCustomerWalletUseCase?: TopupCustomerWalletUseCase;
+  payInvoiceFromWalletUseCase?: PayInvoiceFromWalletUseCase;
 }): Router {
   const router = Router();
 
@@ -55,7 +69,7 @@ export function createCustomerRouter(deps: {
           isServiceOnly: isServiceOnly === "true" ? true : isServiceOnly === "false" ? false : undefined,
           search: typeof search === "string" && search.trim().length > 0 ? search.trim() : undefined,
         },
-        { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 100) }
+        { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 500) }
       );
       sendData(res, result);
     } catch (err: unknown) {
@@ -133,6 +147,85 @@ export function createCustomerRouter(deps: {
       sendError(res, 500, { code: "INTERNAL_ERROR", message });
     }
   });
+
+  // Customer Profile: Complete 360-degree view (Financial summary, Invoices, Returns, Payments, Wallet ledger)
+  router.get(
+    "/customers/:id/profile",
+    requirePermission("masterData.view", "masterData.manage", "sales.view", "sales.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!deps.getCustomerProfileUseCase) {
+          sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Customer profile not configured." });
+          return;
+        }
+        const profile = await deps.getCustomerProfileUseCase.execute(req.params.id!);
+        sendData(res, profile);
+      } catch (err: unknown) {
+        if (err instanceof SimpleMasterDataNotFoundError) {
+          sendError(res, 404, { code: "NOT_FOUND", message: err.message });
+          return;
+        }
+        const message = err instanceof Error ? err.message : "Failed to get customer profile";
+        sendError(res, 500, { code: "INTERNAL_ERROR", message });
+      }
+    }
+  );
+
+  // Customer Wallet Top-up
+  router.post(
+    "/customers/:id/wallet/topup",
+    requirePermission("masterData.manage", "sales.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!deps.topupCustomerWalletUseCase) {
+          sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Wallet topup not configured." });
+          return;
+        }
+        const { amount, notes } = req.body ?? {};
+        const parsedAmount = Number(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+          sendError(res, 422, { code: "VALIDATION_ERROR", message: "amount must be a positive number." });
+          return;
+        }
+        const userId = (req as any).user?.id;
+        const result = await deps.topupCustomerWalletUseCase.execute(req.params.id!, parsedAmount, notes, userId);
+        sendData(res, result, 201);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to top up customer wallet";
+        sendError(res, 400, { code: "TOPUP_FAILED", message });
+      }
+    }
+  );
+
+  // Pay Invoice Due from Customer Wallet
+  router.post(
+    "/customers/:id/wallet/pay-invoice",
+    requirePermission("masterData.manage", "sales.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        if (!deps.payInvoiceFromWalletUseCase) {
+          sendError(res, 501, { code: "NOT_IMPLEMENTED", message: "Wallet invoice payment not configured." });
+          return;
+        }
+        const { invoiceId, amount, notes } = req.body ?? {};
+        if (!invoiceId || typeof invoiceId !== "string") {
+          sendError(res, 422, { code: "VALIDATION_ERROR", message: "invoiceId is required." });
+          return;
+        }
+        const parsedAmount = Number(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+          sendError(res, 422, { code: "VALIDATION_ERROR", message: "amount must be a positive number." });
+          return;
+        }
+        const userId = (req as any).user?.id;
+        const result = await deps.payInvoiceFromWalletUseCase.execute(req.params.id!, invoiceId, parsedAmount, notes, userId);
+        sendData(res, result, 200);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to pay invoice from wallet";
+        sendError(res, 400, { code: "PAYMENT_FAILED", message });
+      }
+    }
+  );
 
   return router;
 }

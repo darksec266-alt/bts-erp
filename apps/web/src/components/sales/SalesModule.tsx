@@ -22,6 +22,8 @@ import {
   FileMinus,
   Undo2,
   PackageCheck,
+  RotateCcw,
+  Wallet,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import type {
@@ -40,6 +42,7 @@ import type {
   PaymentDto,
   CreditNoteDto,
   DeliveryChallanReturnDto,
+  SalesReturnDto,
 } from "@bts/shared-types";
 import { CreateQuotationModal } from "./CreateQuotationModal";
 import { QuotationDetailDrawer } from "./QuotationDetailDrawer";
@@ -55,6 +58,7 @@ import { AdjustAdvanceModal } from "./AdjustAdvanceModal";
 import { RecordPaymentModal } from "./RecordPaymentModal";
 import { CreateCreditNoteModal } from "./CreateCreditNoteModal";
 import { CreateChallanReturnModal } from "./CreateChallanReturnModal";
+import { CreateSalesReturnModal } from "./CreateSalesReturnModal";
 import { OrderFulfillmentModal } from "./OrderFulfillmentModal";
 import { ToastContainer, type ToastMessage } from "../common/Toast";
 
@@ -163,6 +167,13 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
   const [createChallanReturnModalOpen, setCreateChallanReturnModalOpen] = useState(false);
   const [defaultChallanForReturn, setDefaultChallanForReturn] = useState<DeliveryChallanDto | null>(null);
 
+  // Sales Returns State (Invoice-wise Customer Returns with Wallet Credit)
+  const [salesReturns, setSalesReturns] = useState<SalesReturnDto[]>([]);
+  const [salesReturnsTotal, setSalesReturnsTotal] = useState(0);
+  const [createSalesReturnModalOpen, setCreateSalesReturnModalOpen] = useState(false);
+  const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<InvoiceDto | null>(null);
+  const [returnsSubTab, setReturnsSubTab] = useState<"sales_returns" | "challan_returns">("sales_returns");
+
   // Order Fulfillment State
   const [fulfillmentModalOpen, setFulfillmentModalOpen] = useState(false);
   const [fulfillmentOrderId, setFulfillmentOrderId] = useState("");
@@ -220,8 +231,8 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
       try {
         const [bRes, cRes, pRes] = await Promise.all([
           api.getBranches(),
-          api.getCustomers(),
-          api.getProducts({ take: 100 }),
+          api.getCustomers({ take: 300 }),
+          api.getProducts({ take: 300 }),
         ]);
         setBranches(bRes.items || []);
         setCustomers(cRes.items || []);
@@ -312,12 +323,22 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
         setCreditNotes(res.items || []);
         setCreditNotesTotal(res.total || 0);
       } else if (activeTab === "returns") {
-        const res = await api.getChallanReturns({
-          skip,
-          take,
-        });
-        setChallanReturns(res.items || []);
-        setChallanReturnsTotal(res.total || 0);
+        if (returnsSubTab === "sales_returns") {
+          const res = await api.getSalesReturns({
+            branchId: branchFilter || undefined,
+            skip,
+            take,
+          });
+          setSalesReturns(res.items || []);
+          setSalesReturnsTotal(res.total || 0);
+        } else {
+          const res = await api.getChallanReturns({
+            skip,
+            take,
+          });
+          setChallanReturns(res.items || []);
+          setChallanReturnsTotal(res.total || 0);
+        }
       }
     } catch (err) {
       addToast("error", err instanceof Error ? err.message : "Failed to load sales data");
@@ -325,7 +346,7 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab, branchFilter, statusFilter, challanBillingFilter, search, page, pageSize]);
+  }, [activeTab, returnsSubTab, branchFilter, statusFilter, challanBillingFilter, search, page, pageSize]);
 
   useEffect(() => {
     setLoading(true);
@@ -544,6 +565,8 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
       ? paymentsTotal
       : activeTab === "credit-notes"
       ? creditNotesTotal
+      : returnsSubTab === "sales_returns"
+      ? salesReturnsTotal
       : challanReturnsTotal;
 
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
@@ -1576,6 +1599,17 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
                                 </button>
                                 <button
                                   onClick={() => {
+                                    setSelectedInvoiceForReturn(inv);
+                                    setCreateSalesReturnModalOpen(true);
+                                  }}
+                                  className="px-2.5 py-1 text-caption font-medium rounded-sm border border-warning/30 bg-warning-tint hover:bg-warning/20 text-warning inline-flex items-center gap-1 transition-colors"
+                                  title="Process Sales Return (restores inventory & credits customer wallet)"
+                                >
+                                  <Undo2 className="w-3.5 h-3.5" />
+                                  <span>Return</span>
+                                </button>
+                                <button
+                                  onClick={() => {
                                     api.getInvoice(inv.id).then((fullInv) => {
                                       setSelectedInvoice(fullInv);
                                       setInvoiceDrawerOpen(true);
@@ -1871,101 +1905,239 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
               </>
             )}
 
-            {/* TAB 8: CHALLAN RETURNS TABLE */}
+            {/* TAB 8: RETURNS (Invoice Sales Returns & Challan Returns) */}
             {activeTab === "returns" && (
-              <>
-                {challanReturns.length === 0 ? (
-                  <div className="p-16 text-center space-y-3">
-                    <Undo2 className="w-12 h-12 mx-auto text-text-muted/40" />
-                    <h3 className="text-h3 font-bold text-ink">No Challan Returns Recorded</h3>
-                    <p className="text-body text-text-muted max-w-md mx-auto">
-                      When delivered equipment is rejected at site or returned for repair/replacement, record the Challan Return here.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setDefaultChallanForReturn(null);
-                        setCreateChallanReturnModalOpen(true);
-                      }}
-                      className="px-4 py-2 mt-2 rounded-sm bg-primary text-white text-body font-medium hover:bg-primary-hover shadow-sm inline-flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Record Challan Return</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-body">
-                      <thead className="bg-page-bg/70 text-text-muted text-[11px] uppercase tracking-wider font-semibold border-b border-border">
-                        <tr>
-                          <th className="py-3 px-4">Return #</th>
-                          <th className="py-3 px-4">Origin Challan #</th>
-                          <th className="py-3 px-4">Customer Account</th>
-                          <th className="py-3 px-4">Return Date</th>
-                          <th className="py-3 px-4">Returned Items & Conditions</th>
-                          <th className="py-3 px-4 text-center">Damage Report</th>
-                          <th className="py-3 px-4">Reason / Notes</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {challanReturns.map((cr) => (
-                          <tr key={cr.id} className="hover:bg-page-bg/40 transition-colors">
-                            <td className="py-3 px-4">
-                              <span className="font-mono font-bold text-ink">{cr.returnNumber}</span>
-                            </td>
-                            <td className="py-3 px-4">
-                              {cr.challan ? (
-                                <span className="font-mono text-purple font-semibold">
-                                  {cr.challan.challanNumber}
-                                </span>
-                              ) : (
-                                <span className="font-mono text-text-muted">{cr.challanId}</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4">
-                              <p className="font-semibold text-ink leading-tight">
-                                {cr.challan?.salesOrder?.customer?.displayName || "Customer"}
-                              </p>
-                            </td>
-                            <td className="py-3 px-4 text-caption text-text-muted">
-                              {new Date(cr.createdAt).toLocaleDateString()}
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="space-y-1">
-                                {cr.lines?.map((line) => (
-                                  <div key={line.id} className="text-caption flex items-center gap-1.5">
-                                    <span className="font-semibold text-ink">{line.quantity}x</span>
-                                    <span
-                                      className={`text-[10px] font-semibold px-1.5 py-0.2 rounded border ${
-                                        line.condition === "GOOD"
-                                          ? "bg-success-tint text-success border-success/20"
-                                          : "bg-danger-tint text-danger border-danger/20"
-                                      }`}
-                                    >
-                                      {line.condition}
-                                    </span>
+              <div className="p-4 space-y-4">
+                {/* Subtabs Switcher */}
+                <div className="flex items-center gap-2 p-1 bg-page-bg rounded-md border border-border w-fit">
+                  <button
+                    onClick={() => {
+                      setReturnsSubTab("sales_returns");
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1.5 text-caption font-semibold rounded transition-colors flex items-center gap-1.5 ${
+                      returnsSubTab === "sales_returns"
+                        ? "bg-surface text-ink shadow-xs"
+                        : "text-text-muted hover:text-ink"
+                    }`}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-warning" />
+                    <span>Invoice Sales Returns ({salesReturnsTotal})</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setReturnsSubTab("challan_returns");
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1.5 text-caption font-semibold rounded transition-colors flex items-center gap-1.5 ${
+                      returnsSubTab === "challan_returns"
+                        ? "bg-surface text-ink shadow-xs"
+                        : "text-text-muted hover:text-ink"
+                    }`}
+                  >
+                    <Truck className="w-3.5 h-3.5 text-purple" />
+                    <span>Challan Physical Returns ({challanReturnsTotal})</span>
+                  </button>
+                </div>
+
+                {/* Subtab 1: Invoice Sales Returns */}
+                {returnsSubTab === "sales_returns" && (
+                  <>
+                    {salesReturns.length === 0 ? (
+                      <div className="p-16 text-center space-y-3">
+                        <RotateCcw className="w-12 h-12 mx-auto text-text-muted/40" />
+                        <h3 className="text-h3 font-bold text-ink">No Sales Returns Recorded</h3>
+                        <p className="text-body text-text-muted max-w-md mx-auto">
+                          Customer product returns against invoices restock inventory in real-time and credit refunds to the customer&apos;s wallet.
+                        </p>
+                        <p className="text-caption text-text-muted">
+                          You can initiate a Sales Return directly from any invoice row in the <strong>Invoices &amp; Billing</strong> tab.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border border-border rounded-md bg-surface">
+                        <table className="w-full text-left text-body">
+                          <thead className="bg-page-bg/70 text-text-muted text-[11px] uppercase tracking-wider font-semibold border-b border-border">
+                            <tr>
+                              <th className="py-3 px-4">Return #</th>
+                              <th className="py-3 px-4">Invoice #</th>
+                              <th className="py-3 px-4">Customer Account</th>
+                              <th className="py-3 px-4">Restocked Warehouse</th>
+                              <th className="py-3 px-4">Return Date</th>
+                              <th className="py-3 px-4">Returned Items &amp; Serials</th>
+                              <th className="py-3 px-4 text-right">Refund / Wallet (৳)</th>
+                              <th className="py-3 px-4 text-center">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {salesReturns.map((sr) => (
+                              <tr key={sr.id} className="hover:bg-page-bg/40 transition-colors">
+                                <td className="py-3 px-4">
+                                  <span className="font-mono font-bold text-ink">{sr.returnNumber}</span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className="font-mono font-semibold text-primary">
+                                    {sr.invoice?.invoiceNumber || sr.invoiceId}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <p className="font-semibold text-ink leading-tight">
+                                    {sr.customer?.displayName || "Customer"}
+                                  </p>
+                                  <span className="text-[11px] text-text-muted font-mono">
+                                    {sr.customer?.customerCode}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-body text-ink">
+                                  {sr.warehouse?.name || "Main Warehouse"}
+                                </td>
+                                <td className="py-3 px-4 text-caption text-text-muted">
+                                  {new Date(sr.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="space-y-1">
+                                    {sr.lines?.map((line) => (
+                                      <div key={line.id} className="text-caption flex flex-wrap items-center gap-1.5">
+                                        <span className="font-semibold text-ink">{line.quantity}x</span>
+                                        <span className="text-ink">{line.product?.name || "Item"}</span>
+                                        {line.serials && line.serials.length > 0 && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {line.serials.map((s) => (
+                                              <span
+                                                key={s}
+                                                className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-tint text-purple border border-purple/20"
+                                              >
+                                                {s}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              {cr.lines?.some((l) => l.damageLossReportId) ? (
-                                <span className="text-[11px] font-semibold text-danger px-2 py-0.5 rounded-full bg-danger-tint border border-danger/20">
-                                  Auto-Reported
-                                </span>
-                              ) : (
-                                <span className="text-caption text-text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-caption text-text-muted max-w-xs truncate">
-                              {cr.lines?.map((l) => `${l.quantity}x ${l.condition}`).join(", ") || "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <p className="font-mono font-bold text-emerald-600">
+                                    ৳{sr.refundAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                                  </p>
+                                  {sr.creditToWallet && (
+                                    <span className="text-[10px] font-medium text-emerald-600 flex items-center justify-end gap-1 mt-0.5">
+                                      <Wallet className="w-3 h-3" />
+                                      <span>Wallet Credited</span>
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <span className="text-[11px] font-semibold text-success px-2 py-0.5 rounded-full bg-success-tint border border-success/20">
+                                    {sr.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
+
+                {/* Subtab 2: Challan Physical Returns */}
+                {returnsSubTab === "challan_returns" && (
+                  <>
+                    {challanReturns.length === 0 ? (
+                      <div className="p-16 text-center space-y-3">
+                        <Undo2 className="w-12 h-12 mx-auto text-text-muted/40" />
+                        <h3 className="text-h3 font-bold text-ink">No Challan Returns Recorded</h3>
+                        <p className="text-body text-text-muted max-w-md mx-auto">
+                          When delivered equipment is rejected at site or returned for repair/replacement, record the Challan Return here.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setDefaultChallanForReturn(null);
+                            setCreateChallanReturnModalOpen(true);
+                          }}
+                          className="px-4 py-2 mt-2 rounded-sm bg-primary text-white text-body font-medium hover:bg-primary-hover shadow-sm inline-flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Record Challan Return</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border border-border rounded-md bg-surface">
+                        <table className="w-full text-left text-body">
+                          <thead className="bg-page-bg/70 text-text-muted text-[11px] uppercase tracking-wider font-semibold border-b border-border">
+                            <tr>
+                              <th className="py-3 px-4">Return #</th>
+                              <th className="py-3 px-4">Origin Challan #</th>
+                              <th className="py-3 px-4">Customer Account</th>
+                              <th className="py-3 px-4">Return Date</th>
+                              <th className="py-3 px-4">Returned Items &amp; Conditions</th>
+                              <th className="py-3 px-4 text-center">Damage Report</th>
+                              <th className="py-3 px-4">Reason / Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {challanReturns.map((cr) => (
+                              <tr key={cr.id} className="hover:bg-page-bg/40 transition-colors">
+                                <td className="py-3 px-4">
+                                  <span className="font-mono font-bold text-ink">{cr.returnNumber}</span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  {cr.challan ? (
+                                    <span className="font-mono text-purple font-semibold">
+                                      {cr.challan.challanNumber}
+                                    </span>
+                                  ) : (
+                                    <span className="font-mono text-text-muted">{cr.challanId}</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <p className="font-semibold text-ink leading-tight">
+                                    {cr.challan?.salesOrder?.customer?.displayName || "Customer"}
+                                  </p>
+                                </td>
+                                <td className="py-3 px-4 text-caption text-text-muted">
+                                  {new Date(cr.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="space-y-1">
+                                    {cr.lines?.map((line) => (
+                                      <div key={line.id} className="text-caption flex items-center gap-1.5">
+                                        <span className="font-semibold text-ink">{line.quantity}x</span>
+                                        <span
+                                          className={`text-[10px] font-semibold px-1.5 py-0.2 rounded border ${
+                                            line.condition === "GOOD"
+                                              ? "bg-success-tint text-success border-success/20"
+                                              : "bg-danger-tint text-danger border-danger/20"
+                                          }`}
+                                        >
+                                          {line.condition}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {cr.lines?.some((l) => l.damageLossReportId) ? (
+                                    <span className="text-[11px] font-semibold text-danger px-2 py-0.5 rounded-full bg-danger-tint border border-danger/20">
+                                      Auto-Reported
+                                    </span>
+                                  ) : (
+                                    <span className="text-caption text-text-muted">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-caption text-text-muted max-w-xs truncate">
+                                  {cr.lines?.map((l) => `${l.quantity}x ${l.condition}`).join(", ") || "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
             {/* Pagination Controls */}
@@ -2200,6 +2372,20 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
         }}
         challans={challans}
         defaultChallanId={defaultChallanForReturn?.id}
+      />
+
+      {/* Invoice Sales Return Modal */}
+      <CreateSalesReturnModal
+        invoice={selectedInvoiceForReturn}
+        isOpen={createSalesReturnModalOpen}
+        onClose={() => {
+          setCreateSalesReturnModalOpen(false);
+          setSelectedInvoiceForReturn(null);
+        }}
+        onSuccess={() => {
+          addToast("success", "Sales return processed successfully! Products restocked and customer wallet credited.");
+          fetchData();
+        }}
       />
 
       {/* Sales Order Fulfillment Modal */}

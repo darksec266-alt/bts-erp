@@ -147,7 +147,7 @@ export const ProcurementModule: React.FC = () => {
         api.getPurchaseRequests({ take: 100 }),
         api.getPurchaseOrders({ take: 100 }),
         api.getGrns({ take: 100 }),
-        api.getProducts({ take: 100 }),
+        api.getProducts({ take: 300 }),
         api.getBranches(),
       ]);
 
@@ -1022,8 +1022,9 @@ export const ProcurementModule: React.FC = () => {
                     const totalOrdered = po.totalOrderedQuantity ?? po.lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
                     const totalReceived = po.totalReceivedQuantity ?? po.lines.reduce((s, l) => s + Number(l.receivedQuantity || 0), 0);
                     const percent = totalOrdered > 0 ? Math.min(100, Math.round((totalReceived / totalOrdered) * 100)) : 0;
-                    const isFullyReceived = po.fulfillmentStatus === "FULLY_RECEIVED" || (totalOrdered > 0 && totalReceived >= totalOrdered);
-                    const isPartial = po.fulfillmentStatus === "PARTIALLY_RECEIVED" || (totalReceived > 0 && !isFullyReceived);
+                    const isCancelled = po.fulfillmentStatus === "CANCELLED" || (po as any).status === "CANCELLED";
+                    const isFullyReceived = !isCancelled && (po.fulfillmentStatus === "FULLY_RECEIVED" || (totalOrdered > 0 && totalReceived >= totalOrdered));
+                    const isPartial = !isCancelled && (po.fulfillmentStatus === "PARTIALLY_RECEIVED" || (totalReceived > 0 && !isFullyReceived));
 
                     return (
                       <tr key={po.id} className="hover:bg-page-bg/40 transition-colors">
@@ -1049,14 +1050,21 @@ export const ProcurementModule: React.FC = () => {
                         <td className="py-3.5 px-4">
                           <span
                             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-caption font-semibold border ${
-                              isFullyReceived
+                              isCancelled
+                                ? "bg-red-500/10 text-red-700 border-red-500/20"
+                                : isFullyReceived
                                 ? "bg-success-tint text-success border-success/30"
                                 : isPartial
                                 ? "bg-blue-500/10 text-blue-700 border-blue-500/20"
                                 : "bg-amber-500/10 text-amber-700 border-amber-500/20"
                             }`}
                           >
-                            {isFullyReceived ? (
+                            {isCancelled ? (
+                              <>
+                                <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                <span>Cancelled</span>
+                              </>
+                            ) : isFullyReceived ? (
                               <>
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 <span>Fully Received</span>
@@ -1083,7 +1091,7 @@ export const ProcurementModule: React.FC = () => {
                             <div className="w-full h-1.5 bg-border/60 rounded-full overflow-hidden">
                               <div
                                 className={`h-full transition-all duration-300 ${
-                                  isFullyReceived ? "bg-success" : isPartial ? "bg-primary" : "bg-amber-500"
+                                  isCancelled ? "bg-danger" : isFullyReceived ? "bg-success" : isPartial ? "bg-primary" : "bg-amber-500"
                                 }`}
                                 style={{ width: `${percent}%` }}
                               />
@@ -1106,7 +1114,12 @@ export const ProcurementModule: React.FC = () => {
                               <Eye className="w-3.5 h-3.5 text-text-muted" />
                               <span>Details</span>
                             </button>
-                            {isFullyReceived ? (
+                            {isCancelled ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 text-caption font-semibold text-text-muted bg-page-bg border border-border rounded-sm cursor-not-allowed">
+                                <XCircle className="w-3.5 h-3.5 text-red-500" />
+                                <span>Cancelled</span>
+                              </span>
+                            ) : isFullyReceived ? (
                               <span className="inline-flex items-center gap-1 px-3 py-1.5 text-caption font-semibold text-text-muted bg-page-bg border border-border rounded-sm cursor-not-allowed">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-success" />
                                 <span>Completed</span>

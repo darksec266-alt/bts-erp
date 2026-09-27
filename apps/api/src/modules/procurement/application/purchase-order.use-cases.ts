@@ -80,7 +80,21 @@ export class GetPurchaseOrderUseCase {
 export class ListPurchaseOrdersUseCase {
   constructor(private readonly purchaseOrders: PurchaseOrderRepository) {}
 
-  async execute(filter: { branchId?: string; supplierId?: string }, page: { skip: number; take: number }) {
+  async execute(filter: { branchId?: string; supplierId?: string; status?: string; search?: string }, page: { skip: number; take: number }) {
     return this.purchaseOrders.list(filter, page);
   }
 }
+
+export class CancelPurchaseOrderUseCase {
+  constructor(private readonly purchaseOrders: PurchaseOrderRepository) {}
+
+  async execute(id: string, cancelledById: string, reason?: string): Promise<PurchaseOrderRecord> {
+    const po = await this.purchaseOrders.findById(id);
+    if (!po) throw new SimpleMasterDataNotFoundError("purchase order");
+    if (!this.purchaseOrders.cancel) {
+      throw new Error("Cancellation is not supported by the purchase order repository.");
+    }
+    return this.purchaseOrders.cancel(id, cancelledById, reason);
+  }
+}
+

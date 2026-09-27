@@ -26,6 +26,7 @@ import type {
   InvoiceDto,
 } from "@bts/shared-types";
 import { ProductSearchSelect } from "../common/ProductSearchSelect";
+import { CustomerSearchSelect } from "../common/CustomerSearchSelect";
 import { WindowHeaderActions, WindowMinimizedPill } from "../common/WindowContainer";
 
 interface DirectSaleModalProps {
@@ -67,21 +68,34 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
   const [warehouses, setWarehouses] = useState<WarehouseDto[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [productList, setProductList] = useState<ProductDto[]>(products);
+  const [customerList, setCustomerList] = useState<CustomerDto[]>(customers);
 
-  // Sync products prop
+  // Sync props
   useEffect(() => {
     if (products && products.length > 0) {
       setProductList(products);
     }
   }, [products]);
 
-  // Always fetch fresh products and stock when modal is opened
+  useEffect(() => {
+    if (customers && customers.length > 0) {
+      setCustomerList(customers);
+    }
+  }, [customers]);
+
+  // Always fetch fresh products, stock and customers when modal is opened
   useEffect(() => {
     if (!isOpen) return;
-    api.getProducts({ take: 200 })
-      .then((res) => {
-        if (res.items && res.items.length > 0) {
-          setProductList(res.items);
+    Promise.all([
+      api.getProducts({ take: 300 }),
+      api.getCustomers({ take: 300 }),
+    ])
+      .then(([pRes, cRes]) => {
+        if (pRes.items && pRes.items.length > 0) {
+          setProductList(pRes.items);
+        }
+        if (cRes.items && cRes.items.length > 0) {
+          setCustomerList(cRes.items);
         }
       })
       .catch(console.error);
@@ -552,18 +566,12 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                 <label className="block text-caption font-semibold text-ink mb-1.5">
                   Customer <span className="text-danger">*</span>
                 </label>
-                <select
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none cursor-pointer"
+                <CustomerSearchSelect
+                  customers={customerList}
+                  selectedCustomerId={customerId}
+                  onSelect={(c) => setCustomerId(c?.id || "")}
                   required
-                >
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.displayName} ({c.customerCode})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>

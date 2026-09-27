@@ -65,7 +65,7 @@ export function createGrnRouter(deps: {
     const { purchaseOrderId, status, skip, take } = req.query;
     const result = await deps.listGrnsUseCase.execute(
       { purchaseOrderId: typeof purchaseOrderId === "string" ? purchaseOrderId : undefined, status: typeof status === "string" ? status : undefined },
-      { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 100) }
+      { skip: Number(skip) || 0, take: Math.min(Number(take) || 20, 500) }
     );
     sendData(res, result);
   });
