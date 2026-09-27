@@ -35,7 +35,7 @@ export interface PurchaseOrderRecord {
     receivedQuantity?: number;
     remainingQuantity?: number;
     fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED";
-    product?: { id: string; sku: string; name: string };
+    product?: { id: string; sku: string; name: string; trackingType?: "SERIALIZED" | "NON_SERIALIZED"; modelNumber?: string | null; barcode?: string | null };
   }[];
   grns?: {
     id: string;

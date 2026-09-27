@@ -42,6 +42,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
   const [costPrice, setCostPrice] = useState("0");
   const [sellingPrice, setSellingPrice] = useState("0");
   const [isServiceItem, setIsServiceItem] = useState(false);
+  const [trackingType, setTrackingType] = useState<"SERIALIZED" | "NON_SERIALIZED">("NON_SERIALIZED");
+  const [modelNumber, setModelNumber] = useState("");
+  const [barcode, setBarcode] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +61,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       setCostPrice("0");
       setSellingPrice("0");
       setIsServiceItem(false);
+      setTrackingType("NON_SERIALIZED");
+      setModelNumber("");
+      setBarcode("");
       setError(null);
     }
   }, [isOpen, categories, brands, units]);
@@ -94,6 +100,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         costPrice: String(costPrice),
         sellingPrice: String(sellingPrice),
         isServiceItem,
+        trackingType,
+        modelNumber: modelNumber.trim() || undefined,
+        barcode: barcode.trim() || undefined,
       });
       onSuccess(created);
       onClose();
@@ -184,6 +193,88 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 className="w-full px-3 py-2 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
                 placeholder="e.g. 2MP Dome HD Camera"
                 required
+              />
+            </div>
+          </div>
+
+          {/* Inventory Tracking Type */}
+          <div className="p-3 bg-page-bg/60 rounded-md border border-border space-y-2">
+            <label className="block text-caption font-semibold text-ink">
+              Inventory Tracking Type <span className="text-danger">*</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label
+                className={`flex items-start gap-2.5 p-2.5 rounded-sm border cursor-pointer transition-colors ${
+                  trackingType === "NON_SERIALIZED"
+                    ? "border-primary bg-primary-tint/30 text-ink"
+                    : "border-border bg-surface text-text-muted hover:border-border-strong"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="trackingType"
+                  value="NON_SERIALIZED"
+                  checked={trackingType === "NON_SERIALIZED"}
+                  onChange={() => setTrackingType("NON_SERIALIZED")}
+                  className="mt-0.5 accent-primary"
+                />
+                <div>
+                  <div className="text-body font-semibold text-ink">Non-Serialized / Bulk Product</div>
+                  <div className="text-caption text-text-muted">
+                    Tracked by quantity only (e.g. BNC Connectors, RJ45, DC Pins, Cables, Adapters).
+                  </div>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-2.5 p-2.5 rounded-sm border cursor-pointer transition-colors ${
+                  trackingType === "SERIALIZED"
+                    ? "border-primary bg-primary-tint/30 text-ink"
+                    : "border-border bg-surface text-text-muted hover:border-border-strong"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="trackingType"
+                  value="SERIALIZED"
+                  checked={trackingType === "SERIALIZED"}
+                  onChange={() => setTrackingType("SERIALIZED")}
+                  className="mt-0.5 accent-primary"
+                />
+                <div>
+                  <div className="text-body font-semibold text-ink">Serialized Unit Product</div>
+                  <div className="text-caption text-text-muted">
+                    Tracked by unique serial & barcode per physical unit (e.g. CCTV Cameras, NVR, DVR, Hard Disks).
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-caption font-semibold text-ink mb-1">
+                Model Number {trackingType === "SERIALIZED" && <span className="text-primary text-xs">(Recommended)</span>}
+              </label>
+              <input
+                type="text"
+                value={modelNumber}
+                onChange={(e) => setModelNumber(e.target.value)}
+                className="w-full px-3 py-2 text-body font-mono rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
+                placeholder="e.g. DS-2CD2043G2-I"
+              />
+            </div>
+
+            <div>
+              <label className="block text-caption font-semibold text-ink mb-1">
+                Product Model Barcode / EAN
+              </label>
+              <input
+                type="text"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                className="w-full px-3 py-2 text-body font-mono rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none"
+                placeholder="e.g. 6941264019283"
               />
             </div>
           </div>

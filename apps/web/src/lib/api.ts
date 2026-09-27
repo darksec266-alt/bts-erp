@@ -51,6 +51,8 @@ import type {
   CreateBatchRequest,
   SerialNumberDto,
   CreateSerialNumberRequest,
+  BarcodeScanRequest,
+  BarcodeScanResultDto,
   DamageLossReportDto,
   CreateDamageLossReportRequest,
   ApproveDamageLossReportRequest,
@@ -1289,13 +1291,17 @@ class ApiService {
 
   public async getSerialNumbers(params?: {
     productId?: string;
+    warehouseId?: string;
     stage?: string;
+    search?: string;
     skip?: number;
     take?: number;
   }): Promise<{ items: SerialNumberDto[]; total: number }> {
     const searchParams = new URLSearchParams();
     if (params?.productId) searchParams.set("productId", params.productId);
+    if (params?.warehouseId) searchParams.set("warehouseId", params.warehouseId);
     if (params?.stage) searchParams.set("stage", params.stage);
+    if (params?.search) searchParams.set("search", params.search);
     if (params?.skip !== undefined) searchParams.set("skip", String(params.skip));
     if (params?.take !== undefined) searchParams.set("take", String(params.take));
     const qs = searchParams.toString();
@@ -1311,6 +1317,13 @@ class ApiService {
 
   public async getSerialHistory(serial: string): Promise<SerialNumberDto> {
     return this.request<SerialNumberDto>(`/inventory/serial-numbers/${encodeURIComponent(serial)}/history`);
+  }
+
+  public async scanBarcode(data: BarcodeScanRequest): Promise<BarcodeScanResultDto> {
+    return this.request<BarcodeScanResultDto>("/inventory/scan", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
 
   public async getDamageLossReports(params?: {

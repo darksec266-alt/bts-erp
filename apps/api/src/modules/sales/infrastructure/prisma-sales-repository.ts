@@ -44,6 +44,8 @@ export interface SalesPrismaClient {
   product: AnyPrisma;
   warehouse?: AnyPrisma;
   stockLedger?: AnyPrisma;
+  serialNumber?: AnyPrisma;
+  sKULifecycleEvent?: AnyPrisma;
   customer?: AnyPrisma;
   branch?: AnyPrisma;
   $transaction?: <T>(fn: (tx: AnyPrisma) => Promise<T>) => Promise<T>;
@@ -511,6 +513,75 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
         if (warehouse && tx.stockLedger) {
           for (const line of linesToCreate) {
             if (line.productId) {
+              const qtyToDeduct = Number(line.quantity) || 0;
+              const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
+              const isSerialized = prod?.trackingType === "SERIALIZED";
+
+              if (isSerialized && tx.serialNumber) {
+                const lineSerials = (line as any).serialNumberIds || (line as any).serials || [];
+                if (lineSerials.length > 0) {
+                  const units = await tx.serialNumber.findMany({
+                    where: {
+                      OR: [
+                        { id: { in: lineSerials } },
+                        { serial: { in: lineSerials } },
+                        { barcode: { in: lineSerials } },
+                      ],
+                      productId: line.productId,
+                    },
+                  });
+                  for (const unit of units) {
+                    await tx.serialNumber.update({
+                      where: { id: unit.id },
+                      data: { currentStage: "SOLD", warehouseId: null },
+                    });
+                    if (tx.sKULifecycleEvent) {
+                      await tx.sKULifecycleEvent.create({
+                        data: {
+                          serialNumberId: unit.id,
+                          eventType: "SOLD",
+                          sourceModule: "DELIVERY_CHALLAN",
+                          sourceId: row.id,
+                          fromWarehouseId: warehouse.id,
+                          fromStage: "IN_STOCK",
+                          toStage: "SOLD",
+                          notes: `Dispatched via delivery challan ${row.challanNumber}`,
+                        },
+                      }).catch(() => {});
+                    }
+                  }
+                } else if (qtyToDeduct > 0) {
+                  const availableUnits = await tx.serialNumber.findMany({
+                    where: {
+                      productId: line.productId,
+                      warehouseId: warehouse.id,
+                      currentStage: "IN_STOCK",
+                    },
+                    take: qtyToDeduct,
+                  });
+                  for (const unit of availableUnits) {
+                    await tx.serialNumber.update({
+                      where: { id: unit.id },
+                      data: { currentStage: "SOLD", warehouseId: null },
+                    });
+                    if (tx.sKULifecycleEvent) {
+                      await tx.sKULifecycleEvent.create({
+                        data: {
+                          serialNumberId: unit.id,
+                          eventType: "SOLD",
+                          sourceModule: "DELIVERY_CHALLAN",
+                          sourceId: row.id,
+                          fromWarehouseId: warehouse.id,
+                          fromStage: "IN_STOCK",
+                          toStage: "SOLD",
+                          notes: `Dispatched via delivery challan ${row.challanNumber}`,
+                        },
+                      }).catch(() => {});
+                    }
+                  }
+                }
+              }
+
               const stockRow = await tx.stockLedger.findUnique({
                 where: {
                   productId_warehouseId: {
@@ -519,7 +590,6 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
                   },
                 },
               });
-              const qtyToDeduct = Number(line.quantity) || 0;
               if (stockRow) {
                 const currentStock = Number(stockRow.quantityOnHand) || 0;
                 const newStock = Math.max(0, currentStock - qtyToDeduct);
@@ -1375,6 +1445,77 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
         if (warehouse && tx.stockLedger) {
           for (const line of data.lines) {
             if (!line.productId) continue;
+            const qtyToDeduct = Number(line.quantity) || 0;
+            const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
+            const isSerialized = prod?.trackingType === "SERIALIZED";
+
+            if (isSerialized && tx.serialNumber) {
+              const lineSerials = (line as any).serialNumberIds || (line as any).serials || [];
+              if (lineSerials.length > 0) {
+                const units = await tx.serialNumber.findMany({
+                  where: {
+                    OR: [
+                      { id: { in: lineSerials } },
+                      { serial: { in: lineSerials } },
+                      { barcode: { in: lineSerials } },
+                    ],
+                    productId: line.productId,
+                  },
+                });
+                for (const unit of units) {
+                  await tx.serialNumber.update({
+                    where: { id: unit.id },
+                    data: { currentStage: "SOLD", warehouseId: null },
+                  });
+                  if (tx.sKULifecycleEvent) {
+                    await tx.sKULifecycleEvent.create({
+                      data: {
+                        serialNumberId: unit.id,
+                        eventType: "SOLD",
+                        sourceModule: "DIRECT_SALE",
+                        sourceId: invoice.id,
+                        fromWarehouseId: warehouse.id,
+                        fromStage: "IN_STOCK",
+                        toStage: "SOLD",
+                        notes: `Sold via direct sale ${invoiceNumber} / ${orderNumber}`,
+                        performedById: (data as AnyPrisma).salesExecutiveId || null,
+                      },
+                    }).catch(() => {});
+                  }
+                }
+              } else if (qtyToDeduct > 0) {
+                const availableUnits = await tx.serialNumber.findMany({
+                  where: {
+                    productId: line.productId,
+                    warehouseId: warehouse.id,
+                    currentStage: "IN_STOCK",
+                  },
+                  take: qtyToDeduct,
+                });
+                for (const unit of availableUnits) {
+                  await tx.serialNumber.update({
+                    where: { id: unit.id },
+                    data: { currentStage: "SOLD", warehouseId: null },
+                  });
+                  if (tx.sKULifecycleEvent) {
+                    await tx.sKULifecycleEvent.create({
+                      data: {
+                        serialNumberId: unit.id,
+                        eventType: "SOLD",
+                        sourceModule: "DIRECT_SALE",
+                        sourceId: invoice.id,
+                        fromWarehouseId: warehouse.id,
+                        fromStage: "IN_STOCK",
+                        toStage: "SOLD",
+                        notes: `Sold via direct sale ${invoiceNumber} / ${orderNumber}`,
+                        performedById: (data as AnyPrisma).salesExecutiveId || null,
+                      },
+                    }).catch(() => {});
+                  }
+                }
+              }
+            }
+
             const stockRow = await tx.stockLedger.findUnique({
               where: {
                 productId_warehouseId: {
@@ -1383,7 +1524,6 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
                 },
               },
             });
-            const qtyToDeduct = Number(line.quantity) || 0;
             if (stockRow) {
               const currentStock = Number(stockRow.quantityOnHand) || 0;
               const newStock = Math.max(0, currentStock - qtyToDeduct);
@@ -1914,6 +2054,43 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
 
       // Handle stock and damage report effects
       for (const line of computedLines) {
+        const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
+        const isSerialized = prod?.trackingType === "SERIALIZED";
+        const warehouse = tx.warehouse ? await tx.warehouse.findFirst({ where: { branchId: ret.branchId } }) : null;
+
+        if (isSerialized && tx.serialNumber) {
+          const inputLine = data.lines.find((il: AnyPrisma) => il.challanLineId === line.challanLineId);
+          const lineSerials = (inputLine as AnyPrisma)?.serialNumberIds || (inputLine as AnyPrisma)?.serials || [];
+          if (lineSerials.length > 0) {
+            const units = await tx.serialNumber.findMany({
+              where: {
+                OR: [{ id: { in: lineSerials } }, { serial: { in: lineSerials } }],
+                productId: line.productId,
+              },
+            });
+            for (const unit of units) {
+              const newStage = line.condition === "GOOD" ? "IN_STOCK" : "DAMAGED_WRITTEN_OFF";
+              await tx.serialNumber.update({
+                where: { id: unit.id },
+                data: { currentStage: newStage, warehouseId: line.condition === "GOOD" && warehouse ? warehouse.id : null },
+              });
+              if (tx.sKULifecycleEvent) {
+                await tx.sKULifecycleEvent.create({
+                  data: {
+                    serialNumberId: unit.id,
+                    eventType: newStage,
+                    sourceModule: "CHALLAN_RETURN",
+                    sourceId: ret.id,
+                    toWarehouseId: line.condition === "GOOD" && warehouse ? warehouse.id : null,
+                    toStage: newStage,
+                    notes: `Customer returned item via ${ret.returnNumber} (${line.condition})`,
+                  },
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+
         if (line.condition === "GOOD") {
           // Find stock ledger and restore quantity
           if (tx.stockLedger) {

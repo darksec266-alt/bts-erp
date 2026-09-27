@@ -144,6 +144,12 @@ export interface SKULifecycleEventDto {
   eventType: SKULifecycleStage;
   sourceModule: string;
   sourceId: string;
+  fromWarehouseId?: string | null;
+  toWarehouseId?: string | null;
+  fromStage?: SKULifecycleStage | null;
+  toStage?: SKULifecycleStage | null;
+  notes?: string | null;
+  performedById?: string | null;
   occurredAt: string | Date;
 }
 
@@ -151,10 +157,26 @@ export interface SerialNumberDto {
   id: string;
   productId: string;
   serial: string;
+  barcode?: string | null;
+  warehouseId?: string | null;
+  purchaseOrderId?: string | null;
+  grnId?: string | null;
+  grnLineId?: string | null;
+  notes?: string | null;
   currentStage: SKULifecycleStage;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
   product?: {
     id: string;
     sku: string;
+    name: string;
+    trackingType?: "SERIALIZED" | "NON_SERIALIZED";
+    modelNumber?: string | null;
+    barcode?: string | null;
+  } | null;
+  warehouse?: {
+    id: string;
+    code: string;
     name: string;
   } | null;
   events?: SKULifecycleEventDto[];
@@ -163,7 +185,63 @@ export interface SerialNumberDto {
 export interface CreateSerialNumberRequest {
   productId: string;
   serial: string;
+  barcode?: string;
+  warehouseId?: string;
+  purchaseOrderId?: string;
+  grnId?: string;
+  grnLineId?: string;
+  notes?: string;
   currentStage?: SKULifecycleStage;
+}
+
+export type BarcodeScanEntityType = "SERIALIZED_UNIT" | "BULK_PRODUCT" | "UNKNOWN";
+
+export interface BarcodeScanRequest {
+  code: string;
+  warehouseId?: string;
+  intendedOperation?: "RECEIVE" | "DISPATCH" | "TRANSFER" | "SELL" | "VERIFY";
+}
+
+export interface BarcodeScanResultDto {
+  matchedType: BarcodeScanEntityType;
+  query: string;
+  isValid: boolean;
+  validationMessage?: string;
+  product?: {
+    id: string;
+    sku: string;
+    name: string;
+    trackingType: "SERIALIZED" | "NON_SERIALIZED";
+    modelNumber?: string | null;
+    barcode?: string | null;
+    costPrice?: string;
+    sellingPrice?: string;
+    category?: { id: string; name: string } | null;
+  } | null;
+  unit?: {
+    id: string;
+    serial: string;
+    barcode?: string | null;
+    currentStage: SKULifecycleStage;
+    warehouseId?: string | null;
+    warehouseName?: string | null;
+    warehouse?: { id: string; name: string } | null;
+    notes?: string | null;
+  } | null;
+  availableStock?: number;
+  found?: boolean;
+  trackingType?: "SERIALIZED" | "NON_SERIALIZED";
+  serialNumber?: {
+    id: string;
+    serial: string;
+    barcode?: string | null;
+    currentStage: SKULifecycleStage;
+    warehouseId?: string | null;
+    warehouseName?: string | null;
+    warehouse?: { id: string; name: string } | null;
+    notes?: string | null;
+  } | null;
+  availableStockInWarehouse?: number;
 }
 
 export interface DamageLossLineDto {

@@ -3,7 +3,7 @@ import { SimpleMasterDataNotFoundError, DuplicateKeyError } from "../domain/simp
 import type { ProductRepository, ProductRecord } from "./product-repository.port";
 
 const sampleProduct: ProductRecord = {
-  id: "prod_1", sku: "CAM-DOME-2MP", name: "2MP Dome Camera", categoryId: "cat_1", brandId: "brand_1", unitId: "unit_1",
+  id: "prod_1", sku: "CAM-DOME-2MP", name: "2MP Dome Camera", trackingType: "NON_SERIALIZED", categoryId: "cat_1", brandId: "brand_1", unitId: "unit_1",
   costPrice: "3500.00", sellingPrice: "5000.00", isServiceItem: false, isActive: true,
 };
 

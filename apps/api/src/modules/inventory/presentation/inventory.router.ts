@@ -15,6 +15,7 @@ import type {
   CreateSerialNumberUseCase,
   GetSerialHistoryUseCase,
   ListSerialNumbersUseCase,
+  ScanBarcodeUseCase,
   CreateDamageLossReportUseCase,
   ApproveDamageLossReportUseCase,
   ListDamageLossReportsUseCase,
@@ -33,6 +34,7 @@ export interface InventoryRouterDependencies {
   createSerialNumberUseCase: CreateSerialNumberUseCase;
   getSerialHistoryUseCase: GetSerialHistoryUseCase;
   listSerialNumbersUseCase: ListSerialNumbersUseCase;
+  scanBarcodeUseCase: ScanBarcodeUseCase;
   createDamageLossReportUseCase: CreateDamageLossReportUseCase;
   approveDamageLossReportUseCase: ApproveDamageLossReportUseCase;
   listDamageLossReportsUseCase: ListDamageLossReportsUseCase;
@@ -222,6 +224,40 @@ export function createInventoryRouter(deps: InventoryRouterDependencies): Router
   );
 
   // -------------------------------------------------------------
+  // Unified Barcode & Serial Scanner Engine
+  // -------------------------------------------------------------
+  router.post(
+    "/inventory/scan",
+    requirePermission("inventory.view", "inventory.manage", "sales.manage", "procurement.manage"),
+    async (req: Request, res: Response) => {
+      try {
+        const { code, barcode, warehouseId, intendedOperation, operationType } = req.body ?? {};
+        const queryCode = (code || barcode)?.toString().trim();
+        if (!queryCode) {
+          sendError(res, 422, {
+            code: "VALIDATION_ERROR",
+            message: "code or barcode is required",
+          });
+          return;
+        }
+
+        const result = await deps.scanBarcodeUseCase.execute({
+          code: queryCode,
+          warehouseId: typeof warehouseId === "string" ? warehouseId : undefined,
+          intendedOperation: typeof intendedOperation === "string" ? (intendedOperation as any) : undefined,
+        });
+
+        sendData(res, result);
+      } catch (err) {
+        sendError(res, 500, {
+          code: "INTERNAL_ERROR",
+          message: err instanceof Error ? err.message : "Failed to scan barcode",
+        });
+      }
+    }
+  );
+
+  // -------------------------------------------------------------
   // 5. Serial Numbers & Lifecycle History
   // -------------------------------------------------------------
   router.get(
@@ -229,10 +265,12 @@ export function createInventoryRouter(deps: InventoryRouterDependencies): Router
     requirePermission("inventory.view", "inventory.manage"),
     async (req: Request, res: Response) => {
       try {
-        const { productId, stage, skip, take } = req.query;
+        const { productId, warehouseId, stage, search, skip, take } = req.query;
         const result = await deps.listSerialNumbersUseCase.execute({
           productId: typeof productId === "string" ? productId : undefined,
+          warehouseId: typeof warehouseId === "string" ? warehouseId : undefined,
           stage: typeof stage === "string" ? stage : undefined,
+          search: typeof search === "string" ? search : undefined,
           skip: Number(skip) || 0,
           take: Math.min(Number(take) || 50, 100),
         });

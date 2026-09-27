@@ -20,6 +20,17 @@ export interface GrnPrismaClient {
     upsert(args: { where: Record<string, unknown>; update: Record<string, unknown>; create: Record<string, unknown> }): Promise<any>;
     findUnique(args: { where: Record<string, unknown> }): Promise<any>;
   };
+  product?: {
+    findUnique(args: { where: { id: string }; select?: Record<string, boolean> }): Promise<any>;
+    findMany(args: { where: Record<string, unknown> }): Promise<any[]>;
+  };
+  serialNumber?: {
+    findFirst(args: { where: Record<string, unknown> }): Promise<any>;
+    findMany(args: { where: Record<string, unknown> }): Promise<any[]>;
+    create(args: { data: Record<string, unknown> }): Promise<any>;
+    update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<any>;
+    updateMany(args: { where: Record<string, unknown>; data: Record<string, unknown> }): Promise<any>;
+  };
   sKULifecycleEvent?: {
     create(args: { data: Record<string, unknown> }): Promise<any>;
   };
@@ -214,6 +225,53 @@ export class PrismaGrnRepository implements GrnRepository {
         }
       }
 
+      // Validate serialized inventory lines (1-to-1 exact serial count, no duplicates, no existing in DB)
+      for (const line of lines) {
+        const prod = tx.product
+          ? await tx.product.findUnique({ where: { id: line.productId } })
+          : null;
+        const isSerialized = prod?.trackingType === "SERIALIZED";
+        const qty = Number(line.quantityReceived) || 0;
+        const rawSerials = (line as any).serials || [];
+        const normalizedSerials = rawSerials
+          .map((s: any) =>
+            typeof s === "string"
+              ? { serial: s.trim() }
+              : { serial: (s.serial || "").trim(), barcode: s.barcode?.trim(), notes: s.notes?.trim() }
+          )
+          .filter((s: any) => s.serial.length > 0);
+
+        if (isSerialized && line.condition !== "DAMAGED" && line.condition !== "WRONG_SKU") {
+          if (qty > 0 && normalizedSerials.length !== qty) {
+            throw new Error(
+              `Product "${prod?.name || line.productId}" (${prod?.sku || "SKU"}) is SERIALIZED. Quantity received is ${qty}, but ${normalizedSerials.length} serial number(s) were provided. An exact 1-to-1 serial number list is required.`
+            );
+          }
+
+          const seen = new Set<string>();
+          for (const s of normalizedSerials) {
+            const lower = s.serial.toLowerCase();
+            if (seen.has(lower)) {
+              throw new Error(`Duplicate serial number "${s.serial}" detected in submission for product "${prod?.name || line.productId}".`);
+            }
+            seen.add(lower);
+          }
+
+          if (tx.serialNumber && normalizedSerials.length > 0) {
+            const existingSerials = await tx.serialNumber.findMany({
+              where: {
+                serial: { in: normalizedSerials.map((s: any) => s.serial), mode: "insensitive" },
+              },
+            });
+            if (existingSerials && existingSerials.length > 0) {
+              throw new Error(
+                `Serial number "${existingSerials[0].serial}" is already registered in the system (Stage: ${existingSerials[0].currentStage}). Duplicate serial numbers are strictly prohibited.`
+              );
+            }
+          }
+        }
+      }
+
       const row = await tx.goodsReceiptNote.create({
         data: {
           ...rest,
@@ -231,11 +289,59 @@ export class PrismaGrnRepository implements GrnRepository {
         include: grnInclude,
       });
 
-      // Credit stock into StockLedger for items received in hand in good condition
+      // Credit stock into StockLedger and create physical SerialNumber records
       // Note: Draft GRNs NEVER increment inventory! Only posted/received GRNs touch stock.
-      if (input.status !== "DRAFT" && targetWarehouseId && tx.stockLedger) {
-        for (const line of lines) {
-          const qty = Number(line.quantityReceived) || 0;
+      for (const line of lines) {
+        const qty = Number(line.quantityReceived) || 0;
+        const prod = tx.product
+          ? await tx.product.findUnique({ where: { id: line.productId } })
+          : null;
+        const isSerialized = prod?.trackingType === "SERIALIZED";
+        const rawSerials = (line as any).serials || [];
+        const normalizedSerials = rawSerials
+          .map((s: any) =>
+            typeof s === "string"
+              ? { serial: s.trim() }
+              : { serial: (s.serial || "").trim(), barcode: s.barcode?.trim(), notes: s.notes?.trim() }
+          )
+          .filter((s: any) => s.serial.length > 0);
+
+        const grnLine = row.lines?.find((gl: any) => gl.productId === line.productId);
+
+        if (isSerialized && tx.serialNumber && normalizedSerials.length > 0) {
+          for (const s of normalizedSerials) {
+            const createdUnit = await tx.serialNumber.create({
+              data: {
+                productId: line.productId,
+                serial: s.serial,
+                barcode: s.barcode || null,
+                warehouseId: input.status !== "DRAFT" ? targetWarehouseId : null,
+                purchaseOrderId: input.purchaseOrderId,
+                grnId: row.id,
+                grnLineId: grnLine?.id || null,
+                notes: s.notes || null,
+                currentStage: input.status !== "DRAFT" ? "IN_STOCK" : "RECEIVED",
+              },
+            });
+
+            if (tx.sKULifecycleEvent) {
+              await tx.sKULifecycleEvent.create({
+                data: {
+                  serialNumberId: createdUnit.id,
+                  eventType: input.status !== "DRAFT" ? "IN_STOCK" : "RECEIVED",
+                  sourceModule: "GRN",
+                  sourceId: row.id,
+                  toWarehouseId: input.status !== "DRAFT" ? targetWarehouseId : null,
+                  toStage: input.status !== "DRAFT" ? "IN_STOCK" : "RECEIVED",
+                  notes: `Received via GRN ${row.grnNumber} from PO`,
+                  performedById: input.receivedById,
+                },
+              });
+            }
+          }
+        }
+
+        if (input.status !== "DRAFT" && targetWarehouseId && tx.stockLedger) {
           if (qty > 0 && line.condition !== "DAMAGED" && line.condition !== "WRONG_SKU") {
             await tx.stockLedger.upsert({
               where: {
@@ -253,20 +359,6 @@ export class PrismaGrnRepository implements GrnRepository {
                 quantityOnHand: qty,
               },
             });
-
-            if (tx.sKULifecycleEvent) {
-              await tx.sKULifecycleEvent
-                .create({
-                  data: {
-                    productId: line.productId,
-                    eventType: "GOODS_RECEIPT_POSTED",
-                    quantityDelta: qty,
-                    referenceId: row.id,
-                    notes: `Received ${qty} units via ${row.grnNumber} at warehouse ${targetWarehouseId}`,
-                  },
-                })
-                .catch(() => {});
-            }
           }
         }
       }
@@ -336,6 +428,31 @@ export class PrismaGrnRepository implements GrnRepository {
         }
 
         if (targetWarehouseId) {
+          if (tx.serialNumber) {
+            const existingSerials = await tx.serialNumber.findMany({ where: { grnId: id } });
+            if (existingSerials && existingSerials.length > 0) {
+              await tx.serialNumber.updateMany({
+                where: { grnId: id },
+                data: { currentStage: "IN_STOCK", warehouseId: targetWarehouseId },
+              });
+              if (tx.sKULifecycleEvent) {
+                for (const s of existingSerials) {
+                  await tx.sKULifecycleEvent.create({
+                    data: {
+                      serialNumberId: s.id,
+                      eventType: "IN_STOCK",
+                      sourceModule: "GRN",
+                      sourceId: id,
+                      toWarehouseId: targetWarehouseId,
+                      toStage: "IN_STOCK",
+                      notes: `GRN posted from DRAFT to ${status}`,
+                    },
+                  }).catch(() => {});
+                }
+              }
+            }
+          }
+
           for (const line of existing.lines) {
             const qty = Number(line.quantityReceived) || 0;
             if (qty > 0 && line.condition !== "DAMAGED" && line.condition !== "WRONG_SKU") {
@@ -384,6 +501,31 @@ export class PrismaGrnRepository implements GrnRepository {
         return existing;
       }
 
+      // If this GRN had serial numbers, transition them to DAMAGED_WRITTEN_OFF or remove from active stock
+      if (tx.serialNumber) {
+        const existingSerials = await tx.serialNumber.findMany({ where: { grnId: existing.id } });
+        if (existingSerials && existingSerials.length > 0) {
+          await tx.serialNumber.updateMany({
+            where: { grnId: existing.id },
+            data: { currentStage: "DAMAGED_WRITTEN_OFF", warehouseId: null },
+          });
+          if (tx.sKULifecycleEvent) {
+            for (const s of existingSerials) {
+              await tx.sKULifecycleEvent.create({
+                data: {
+                  serialNumberId: s.id,
+                  eventType: "DAMAGED_WRITTEN_OFF",
+                  sourceModule: "GRN_CANCEL",
+                  sourceId: existing.id,
+                  notes: `GRN cancelled by ${cancelledById}: ${reason || "N/A"}`,
+                  performedById: cancelledById,
+                },
+              }).catch(() => {});
+            }
+          }
+        }
+      }
+
       // If this GRN was posted (not draft), reverse its stock addition
       if (existing.status !== "DRAFT" && tx.stockLedger) {
         let targetWarehouseId: string | undefined;
@@ -430,20 +572,6 @@ export class PrismaGrnRepository implements GrnRepository {
                   quantityOnHand: 0,
                 },
               });
-
-              if (tx.sKULifecycleEvent) {
-                await tx.sKULifecycleEvent
-                  .create({
-                    data: {
-                      productId: line.productId,
-                      eventType: "GOODS_RECEIPT_CANCELLED",
-                      quantityDelta: -qty,
-                      referenceId: existing.id,
-                      notes: `GRN ${existing.grnNumber} cancelled by ${cancelledById}: -${qty} units. Reason: ${reason || "N/A"}`,
-                    },
-                  })
-                  .catch(() => {});
-              }
             }
           }
         }

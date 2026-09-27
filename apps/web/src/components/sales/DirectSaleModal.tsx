@@ -13,6 +13,8 @@ import {
   PackageCheck,
   CreditCard,
   Warehouse,
+  Barcode,
+  Sparkles,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import type {
@@ -43,6 +45,8 @@ interface DirectSaleLineInput {
   quantity: number;
   unitPrice: number;
   availableStock?: number;
+  trackingType?: "SERIALIZED" | "NON_SERIALIZED";
+  serials?: string[];
 }
 
 export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
@@ -125,6 +129,11 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [completedResult, setCompletedResult] = useState<DirectSaleResultDto | null>(null);
 
+  // Barcode / Serial scanning state
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
+
   // Load warehouses
   useEffect(() => {
     const loadWarehouses = async () => {
@@ -168,8 +177,144 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
     );
   }
 
+  // POS Barcode Scanner Handler
+  const handleScanBarcode = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const raw = barcodeInput.trim();
+    if (!raw) return;
+
+    try {
+      setScanLoading(true);
+      setError(null);
+      setScanSuccessMessage(null);
+
+      const result = await api.scanBarcode({
+        barcode: raw,
+        warehouseId: warehouseId || undefined,
+      });
+
+      if (!result.found || !result.product) {
+        setError(`No product or serial unit found matching "${raw}".`);
+        return;
+      }
+
+      const prod = result.product;
+      const isSerialized = result.trackingType === "SERIALIZED" || prod.trackingType === "SERIALIZED";
+
+      if (isSerialized) {
+        if (!result.serialNumber) {
+          setError(`"${prod.name}" is a serialized item. Please scan the unit barcode or serial number on the unit label.`);
+          return;
+        }
+
+        const sn = result.serialNumber;
+        if (sn.currentStage !== "IN_STOCK") {
+          setError(`Serial unit "${sn.serial}" is currently ${sn.currentStage} and cannot be sold.`);
+          return;
+        }
+
+        if (warehouseId && sn.warehouseId && sn.warehouseId !== warehouseId) {
+          setError(`Serial unit "${sn.serial}" is in a different warehouse (${sn.warehouse?.name || sn.warehouseId}).`);
+          return;
+        }
+
+        // Check if already in sale cart
+        const alreadyScanned = lines.some((l) => l.serials?.includes(sn.serial));
+        if (alreadyScanned) {
+          setError(`Serial unit "${sn.serial}" is already added to this direct sale.`);
+          return;
+        }
+
+        setLines((prev) => {
+          const nonPlaceholders = prev.filter((l) => l.productId);
+          const existingLineIdx = nonPlaceholders.findIndex((l) => l.productId === prod.id);
+
+          if (existingLineIdx >= 0) {
+            const updated = [...nonPlaceholders];
+            const cur = updated[existingLineIdx];
+            const newSerials = [...(cur.serials || []), sn.serial];
+            updated[existingLineIdx] = {
+              ...cur,
+              serials: newSerials,
+              quantity: newSerials.length,
+              trackingType: "SERIALIZED",
+            };
+            return updated;
+          } else {
+            return [
+              ...nonPlaceholders,
+              {
+                productId: prod.id,
+                description: prod.name,
+                quantity: 1,
+                unitPrice: Number(prod.sellingPrice) || 0,
+                availableStock: getProductStock(prod.id, warehouseId),
+                trackingType: "SERIALIZED",
+                serials: [sn.serial],
+              },
+            ];
+          }
+        });
+
+        setScanSuccessMessage(`Scanned serialized unit: ${prod.name} (SN: ${sn.serial})`);
+      } else {
+        // Non-serialized bulk item scanned
+        setLines((prev) => {
+          const nonPlaceholders = prev.filter((l) => l.productId);
+          const existingLineIdx = nonPlaceholders.findIndex((l) => l.productId === prod.id);
+
+          if (existingLineIdx >= 0) {
+            const updated = [...nonPlaceholders];
+            const cur = updated[existingLineIdx];
+            updated[existingLineIdx] = {
+              ...cur,
+              quantity: Number(cur.quantity || 0) + 1,
+              trackingType: "NON_SERIALIZED",
+            };
+            return updated;
+          } else {
+            return [
+              ...nonPlaceholders,
+              {
+                productId: prod.id,
+                description: prod.name,
+                quantity: 1,
+                unitPrice: Number(prod.sellingPrice) || 0,
+                availableStock: getProductStock(prod.id, warehouseId),
+                trackingType: "NON_SERIALIZED",
+              },
+            ];
+          }
+        });
+
+        setScanSuccessMessage(`Scanned bulk item: ${prod.name} (+1 qty)`);
+      }
+
+      setBarcodeInput("");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to scan barcode.");
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const handleRemoveLineSerial = (lineIndex: number, serialToRemove: string) => {
+    setLines((prev) => {
+      const updated = [...prev];
+      const cur = updated[lineIndex];
+      const newSerials = (cur.serials || []).filter((s) => s !== serialToRemove);
+      updated[lineIndex] = {
+        ...cur,
+        serials: newSerials,
+        quantity: Math.max(1, newSerials.length),
+      };
+      return updated;
+    });
+  };
+
   const handleAddLine = () => {
     const firstProd = productList[0] || products[0];
+    const tracking = firstProd?.trackingType || "NON_SERIALIZED";
     setLines((prev) => [
       ...prev,
       {
@@ -178,6 +323,8 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
         quantity: 1,
         unitPrice: Number(firstProd?.sellingPrice) || 0,
         availableStock: getProductStock(firstProd?.id || "", warehouseId),
+        trackingType: tracking,
+        serials: [],
       },
     ]);
   };
@@ -189,6 +336,7 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
 
   const handleProductChange = (index: number, selectedProductId: string) => {
     const prod = productList.find((p) => p.id === selectedProductId) || products.find((p) => p.id === selectedProductId);
+    const tracking = prod?.trackingType || "NON_SERIALIZED";
     setLines((prev) =>
       prev.map((line, i) => {
         if (i !== index) return line;
@@ -198,6 +346,8 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
           description: prod?.name || "",
           unitPrice: prod ? Number(prod.sellingPrice) || 0 : line.unitPrice,
           availableStock: getProductStock(selectedProductId, warehouseId),
+          trackingType: tracking,
+          serials: [],
         };
       })
     );
@@ -237,6 +387,16 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
       return;
     }
 
+    // Validate serialized lines
+    for (const l of lines) {
+      if (l.trackingType === "SERIALIZED" && l.serials && l.serials.length > 0) {
+        if (l.serials.length !== l.quantity) {
+          setError(`Product "${l.description}" has ${l.serials.length} serial numbers for ${l.quantity} units.`);
+          return;
+        }
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -248,12 +408,15 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
         notes: notes.trim() || undefined,
         isPaid,
         paymentMethod: isPaid ? paymentMethod : undefined,
-        lines: lines.map((l) => ({
-          productId: l.productId,
-          description: l.description,
-          quantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice),
-        })),
+        lines: lines
+          .filter((l) => l.productId && l.quantity > 0)
+          .map((l) => ({
+            productId: l.productId,
+            description: l.description,
+            quantity: Number(l.quantity),
+            unitPrice: Number(l.unitPrice),
+            serials: l.serials && l.serials.length > 0 ? l.serials : undefined,
+          })),
       });
 
       setCompletedResult(result);
@@ -442,6 +605,52 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
               </div>
             </div>
 
+            {/* Quick POS Barcode Scanner Console */}
+            <div className="p-3 bg-purple/5 border border-purple/20 rounded-md space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-caption font-semibold text-ink flex items-center gap-1.5">
+                  <Barcode className="w-4 h-4 text-purple" />
+                  <span>Scan Barcode or Serial (POS Fast Checkout)</span>
+                </span>
+                <span className="text-[11px] text-text-muted">
+                  Supports CCTV cameras, NVRs & bulk accessories
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                  <input
+                    type="text"
+                    value={barcodeInput}
+                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleScanBarcode();
+                      }
+                    }}
+                    placeholder="Scan product barcode or camera serial number (Press Enter)..."
+                    className="w-full h-9 pl-9 pr-3 text-caption font-mono border border-border rounded-sm bg-surface text-ink focus:outline-none focus:ring-1 focus:ring-purple"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleScanBarcode()}
+                  disabled={scanLoading || !barcodeInput.trim()}
+                  className="h-9 px-4 bg-purple text-white rounded-sm text-caption font-semibold hover:bg-purple/90 flex items-center gap-1.5 transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {scanLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Barcode className="w-4 h-4" />}
+                  <span>Scan to Cart</span>
+                </button>
+              </div>
+              {scanSuccessMessage && (
+                <p className="text-[11px] font-semibold text-success flex items-center gap-1 animate-fadeIn">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{scanSuccessMessage}</span>
+                </p>
+              )}
+            </div>
+
             {/* Line Items Table */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -486,6 +695,35 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                               priceType="selling"
                               required
                             />
+                            {line.trackingType === "SERIALIZED" && (
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-purple/10 text-purple border border-purple/30 rounded text-[10px] font-bold">
+                                  <Barcode className="w-3 h-3" />
+                                  SERIALIZED
+                                </span>
+                                {line.serials && line.serials.length > 0 && (
+                                  <span className="text-[10px] text-text-muted font-medium">
+                                    ({line.serials.length} units captured):
+                                  </span>
+                                )}
+                                {line.serials?.map((s) => (
+                                  <span
+                                    key={s}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-surface border border-purple/30 rounded text-[11px] font-mono text-ink shadow-2xs"
+                                  >
+                                    <span>{s}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveLineSerial(index, s)}
+                                      className="text-text-muted hover:text-danger rounded p-0.2"
+                                      title={`Remove ${s}`}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="p-2.5 text-center font-mono">
                             <span
@@ -503,10 +741,13 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                               type="number"
                               min="1"
                               value={line.quantity}
+                              readOnly={line.trackingType === "SERIALIZED" && (line.serials?.length || 0) > 0}
                               onChange={(e) =>
                                 handleLineChange(index, "quantity", Math.max(1, parseInt(e.target.value) || 0))
                               }
-                              className="w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none text-right font-mono"
+                              className={`w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none text-right font-mono ${
+                                line.trackingType === "SERIALIZED" && (line.serials?.length || 0) > 0 ? "opacity-75 cursor-not-allowed" : ""
+                              }`}
                               required
                             />
                           </td>

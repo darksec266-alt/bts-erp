@@ -16,6 +16,9 @@ interface ProductRow {
   id: string;
   sku: string;
   name: string;
+  trackingType?: "SERIALIZED" | "NON_SERIALIZED" | string;
+  modelNumber?: string | null;
+  barcode?: string | null;
   categoryId: string | null;
   subCategoryId?: string | null;
   brandId: string | null;
@@ -52,7 +55,7 @@ function isForeignKeyViolation(err: unknown): boolean {
 }
 
 function toRecord(row: ProductRow): ProductRecord {
-  const { id, sku, name, categoryId, subCategoryId, brandId, unitId, isServiceItem, isActive, category, subCategory, brand, unit } = row;
+  const { id, sku, name, trackingType, modelNumber, barcode, categoryId, subCategoryId, brandId, unitId, isServiceItem, isActive, category, subCategory, brand, unit } = row;
   const stockList = (row.stockLedgers || []).map((sl) => ({
     warehouseId: sl.warehouseId,
     warehouseName: sl.warehouse.name,
@@ -65,6 +68,9 @@ function toRecord(row: ProductRow): ProductRecord {
     id,
     sku,
     name,
+    trackingType: (trackingType as "SERIALIZED" | "NON_SERIALIZED") || "NON_SERIALIZED",
+    modelNumber: modelNumber ?? null,
+    barcode: barcode ?? null,
     categoryId,
     subCategoryId: subCategoryId ?? null,
     brandId,
@@ -114,12 +120,15 @@ export class PrismaProductRepository implements ProductRepository {
     if (filter.categoryId) where.categoryId = filter.categoryId;
     if (filter.subCategoryId) where.subCategoryId = filter.subCategoryId;
     if (filter.brandId) where.brandId = filter.brandId;
+    if (filter.trackingType) where.trackingType = filter.trackingType;
     if (filter.isActive !== undefined) where.isActive = filter.isActive;
     if (filter.isServiceItem !== undefined) where.isServiceItem = filter.isServiceItem;
     if (filter.search) {
       where.OR = [
         { sku: { contains: filter.search, mode: "insensitive" } },
         { name: { contains: filter.search, mode: "insensitive" } },
+        { modelNumber: { contains: filter.search, mode: "insensitive" } },
+        { barcode: { contains: filter.search, mode: "insensitive" } },
       ];
     }
 

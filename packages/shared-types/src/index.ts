@@ -34,6 +34,7 @@ export interface CustomerDto {
   branch?: BranchSummaryDto;
   isServiceOnly: boolean;
   isActive: boolean;
+  walletBalance?: number;
   addresses: CustomerAddressDto[];
   createdAt?: string | Date;
   updatedAt?: string | Date;
@@ -397,6 +398,7 @@ export interface DirectSaleRequest {
     description?: string;
     quantity: number;
     unitPrice: number;
+    serials?: string[];
   }[];
 }
 
@@ -501,6 +503,8 @@ export interface UpdateSubCategoryRequest {
   isActive?: boolean;
 }
 
+export type ProductTrackingType = "SERIALIZED" | "NON_SERIALIZED";
+
 export interface ProductStockDto {
   warehouseId: string;
   warehouseName: string;
@@ -516,6 +520,9 @@ export interface ProductDto {
   subCategoryId?: string | null;
   brandId?: string | null;
   unitId?: string | null;
+  trackingType?: ProductTrackingType;
+  modelNumber?: string | null;
+  barcode?: string | null;
   costPrice: number | string;
   sellingPrice: number | string;
   isServiceItem: boolean;
@@ -537,6 +544,9 @@ export interface CreateProductRequest {
   subCategoryId?: string;
   brandId?: string;
   unitId?: string;
+  trackingType?: ProductTrackingType;
+  modelNumber?: string;
+  barcode?: string;
   costPrice: string;
   sellingPrice: string;
   isServiceItem?: boolean;
@@ -548,6 +558,9 @@ export interface UpdateProductRequest {
   subCategoryId?: string | null;
   brandId?: string | null;
   unitId?: string | null;
+  trackingType?: ProductTrackingType;
+  modelNumber?: string | null;
+  barcode?: string | null;
   costPrice?: string;
   sellingPrice?: string;
   isServiceItem?: boolean;
@@ -649,6 +662,9 @@ export interface PurchaseOrderLineDto {
     id: string;
     sku: string;
     name: string;
+    trackingType?: ProductTrackingType;
+    modelNumber?: string;
+    barcode?: string;
   } | null;
 }
 
@@ -761,6 +777,7 @@ export interface CreateGrnRequest {
     productId: string;
     quantityReceived: number | string;
     condition: "GOOD" | "DAMAGED" | "SHORT" | "WRONG_SKU";
+    serials?: Array<string | { serial: string; barcode?: string; notes?: string }>;
   }[];
 }
 
@@ -914,17 +931,39 @@ export interface SKULifecycleEventDto {
   eventType: SKULifecycleStage;
   sourceModule: string;
   sourceId: string;
+  fromWarehouseId?: string | null;
+  toWarehouseId?: string | null;
+  fromStage?: SKULifecycleStage | null;
+  toStage?: SKULifecycleStage | null;
+  notes?: string | null;
+  performedById?: string | null;
   occurredAt: string | Date;
+  fromWarehouse?: { id: string; code: string; name: string } | null;
+  toWarehouse?: { id: string; code: string; name: string } | null;
 }
 
 export interface SerialNumberDto {
   id: string;
   productId: string;
   serial: string;
+  barcode?: string | null;
+  warehouseId?: string | null;
+  purchaseOrderId?: string | null;
+  grnId?: string | null;
+  notes?: string | null;
   currentStage: SKULifecycleStage;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
   product?: {
     id: string;
     sku: string;
+    name: string;
+    trackingType?: ProductTrackingType;
+    modelNumber?: string | null;
+  } | null;
+  warehouse?: {
+    id: string;
+    code: string;
     name: string;
   } | null;
   events?: SKULifecycleEventDto[];
@@ -933,7 +972,60 @@ export interface SerialNumberDto {
 export interface CreateSerialNumberRequest {
   productId: string;
   serial: string;
+  barcode?: string;
+  warehouseId?: string;
   currentStage?: SKULifecycleStage;
+  notes?: string;
+}
+
+export type BarcodeScanEntityType = "SERIALIZED_UNIT" | "BULK_PRODUCT";
+
+export interface BarcodeScanRequest {
+  barcode: string;
+  warehouseId?: string;
+  operationType?: "GRN" | "POS" | "TRANSFER" | "ISSUE" | "RETURN" | "LOOKUP";
+}
+
+export interface BarcodeScanResultDto {
+  found: boolean;
+  scanType?: BarcodeScanEntityType;
+  scannedCode: string;
+  trackingType?: ProductTrackingType;
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+    trackingType: ProductTrackingType;
+    modelNumber?: string | null;
+    barcode?: string | null;
+    costPrice?: number;
+    sellingPrice?: number;
+    unit?: { id: string; code: string; name: string } | null;
+    category?: { id: string; name: string } | null;
+  };
+  unit?: {
+    id: string;
+    serial: string;
+    barcode?: string | null;
+    currentStage: SKULifecycleStage;
+    warehouseId?: string | null;
+    warehouseName?: string | null;
+    warehouseCode?: string | null;
+    warehouse?: { id: string; name: string } | null;
+  } | null;
+  serialNumber?: {
+    id: string;
+    serial: string;
+    barcode?: string | null;
+    currentStage: SKULifecycleStage;
+    warehouseId?: string | null;
+    warehouseName?: string | null;
+    warehouseCode?: string | null;
+    warehouse?: { id: string; name: string } | null;
+  } | null;
+  availableStockInWarehouse?: number;
+  isValidForOperation: boolean;
+  validationMessage?: string;
 }
 
 export type DamageLossDisposition =
@@ -1116,6 +1208,88 @@ export interface CreateCreditNoteRequest {
   invoiceId: string;
   amount: number;
   reason: string;
+}
+
+export interface SalesReturnLineDto {
+  id: string;
+  salesReturnId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  serials: string[];
+  product?: {
+    id: string;
+    sku: string;
+    name: string;
+    trackingType: ProductTrackingType;
+    modelNumber?: string | null;
+  };
+}
+
+export interface SalesReturnDto {
+  id: string;
+  returnNumber: string;
+  invoiceId: string;
+  customerId: string;
+  branchId: string;
+  warehouseId: string;
+  totalAmount: number;
+  creditToWallet: boolean;
+  refundAmount: number;
+  reason?: string | null;
+  status: string;
+  createdAt: string | Date;
+  invoice?: InvoiceDto;
+  customer?: CustomerDto;
+  warehouse?: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  lines: SalesReturnLineDto[];
+}
+
+export interface CreateSalesReturnRequest {
+  invoiceId: string;
+  warehouseId: string;
+  reason?: string;
+  creditToWallet?: boolean;
+  lines: {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    serials?: string[];
+  }[];
+}
+
+export interface CustomerWalletTransactionDto {
+  id: string;
+  customerId: string;
+  amount: number;
+  type: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  balanceAfter: number;
+  notes?: string | null;
+  createdAt: string | Date;
+}
+
+export interface CustomerFinancialSummaryDto {
+  totalInvoiced: number;
+  totalPaid: number;
+  totalReturned: number;
+  currentDue: number;
+  walletBalance: number;
+}
+
+export interface CustomerProfileDto {
+  customer: CustomerDto;
+  summary: CustomerFinancialSummaryDto;
+  invoices: InvoiceDto[];
+  salesReturns: SalesReturnDto[];
+  payments: PaymentDto[];
+  walletTransactions: CustomerWalletTransactionDto[];
 }
 
 // ═══════════════════════════════════════════════════════════════

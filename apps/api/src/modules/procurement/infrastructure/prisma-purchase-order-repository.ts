@@ -63,7 +63,7 @@ function toRecord(row: any): PurchaseOrderRecord {
       receivedQuantity: received,
       remainingQuantity: remaining,
       fulfillmentStatus: lineStatus,
-      product: l.product ? { id: l.product.id, sku: l.product.sku, name: l.product.name } : undefined,
+      product: l.product ? { id: l.product.id, sku: l.product.sku, name: l.product.name, trackingType: l.product.trackingType, modelNumber: l.product.modelNumber, barcode: l.product.barcode } : undefined,
     };
   });
 

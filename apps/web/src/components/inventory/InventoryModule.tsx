@@ -19,6 +19,7 @@ import {
   Filter,
   DollarSign,
   Package,
+  Barcode,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import type {
@@ -90,6 +91,11 @@ export const InventoryModule: React.FC = () => {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
   const [belowReorderOnly, setBelowReorderOnly] = useState(false);
 
+  // Serial Tracker Filters
+  const [serialSearch, setSerialSearch] = useState("");
+  const [serialWarehouseFilter, setSerialWarehouseFilter] = useState("");
+  const [serialStageFilter, setSerialStageFilter] = useState("");
+
   // Loading & Toasts
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -151,7 +157,12 @@ export const InventoryModule: React.FC = () => {
             take: 100,
           }),
           api.getBatches(),
-          api.getSerialNumbers({ take: 100 }),
+          api.getSerialNumbers({
+            warehouseId: serialWarehouseFilter || undefined,
+            stage: serialStageFilter || undefined,
+            search: serialSearch || undefined,
+            take: 150,
+          }),
           api.getDamageLossReports({
             warehouseId: selectedWarehouseId || undefined,
             take: 100,
@@ -170,7 +181,7 @@ export const InventoryModule: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedWarehouseId, belowReorderOnly, searchTerm]);
+  }, [selectedWarehouseId, belowReorderOnly, searchTerm, serialWarehouseFilter, serialStageFilter, serialSearch]);
 
   useEffect(() => {
     loadData();
@@ -677,51 +688,181 @@ export const InventoryModule: React.FC = () => {
           </div>
 
           {trackingSubTab === "serials" ? (
-            <div className="bg-surface rounded-md border border-border shadow-elevation-1 overflow-hidden">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-page-bg/60 text-caption uppercase tracking-wider text-text-muted font-semibold">
-                    <th className="py-3 px-4">Serial Number</th>
-                    <th className="py-3 px-4">Product Item</th>
-                    <th className="py-3 px-4">Current Stage</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border text-body">
-                  {serials.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-12 text-center text-text-muted">
-                        <QrCode className="w-8 h-8 mx-auto mb-2 text-text-muted/60" />
-                        <p className="font-medium">No serial numbers registered yet</p>
-                      </td>
+            <div className="space-y-4">
+              {/* Mini KPI banner for Serials */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-surface rounded-md border border-border">
+                  <span className="text-[11px] text-text-muted block">Total Tracked Units</span>
+                  <span className="text-h3 font-bold text-ink font-mono">{serials.length}</span>
+                </div>
+                <div className="p-3 bg-emerald-500/5 rounded-md border border-emerald-500/20">
+                  <span className="text-[11px] text-emerald-700 block">In-Stock Available</span>
+                  <span className="text-h3 font-bold text-emerald-700 font-mono">
+                    {serials.filter((s) => s.currentStage === "IN_STOCK").length}
+                  </span>
+                </div>
+                <div className="p-3 bg-indigo-500/5 rounded-md border border-indigo-500/20">
+                  <span className="text-[11px] text-indigo-700 block">Sold / Dispatched</span>
+                  <span className="text-h3 font-bold text-indigo-700 font-mono">
+                    {serials.filter((s) => s.currentStage === "SOLD" || s.currentStage === "INSTALLED").length}
+                  </span>
+                </div>
+                <div className="p-3 bg-rose-500/5 rounded-md border border-rose-500/20">
+                  <span className="text-[11px] text-rose-700 block">Damaged / Written Off</span>
+                  <span className="text-h3 font-bold text-rose-700 font-mono">
+                    {serials.filter((s) => s.currentStage === "DAMAGED_WRITTEN_OFF").length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Serial Filter Toolbar */}
+              <div className="p-3 bg-surface rounded-md border border-border flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[220px]">
+                  <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={serialSearch}
+                    onChange={(e) => setSerialSearch(e.target.value)}
+                    placeholder="Search serial number, barcode, or SKU..."
+                    className="w-full pl-9 pr-3 py-1.5 text-caption rounded-sm border border-border bg-page-bg text-ink focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                  />
+                </div>
+
+                <div className="w-44">
+                  <select
+                    value={serialWarehouseFilter}
+                    onChange={(e) => setSerialWarehouseFilter(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-caption rounded-sm border border-border bg-page-bg text-ink focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="">All Warehouses</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-44">
+                  <select
+                    value={serialStageFilter}
+                    onChange={(e) => setSerialStageFilter(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-caption rounded-sm border border-border bg-page-bg text-ink focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="">All Lifecycle Stages</option>
+                    <option value="IN_STOCK">IN_STOCK (Available)</option>
+                    <option value="SOLD">SOLD (Dispatched)</option>
+                    <option value="RESERVED">RESERVED (In Transit)</option>
+                    <option value="DAMAGED_WRITTEN_OFF">DAMAGED_WRITTEN_OFF</option>
+                    <option value="REPAIRED">REPAIRED</option>
+                    <option value="SCRAPPED">SCRAPPED</option>
+                  </select>
+                </div>
+
+                {(serialSearch || serialWarehouseFilter || serialStageFilter) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSerialSearch("");
+                      setSerialWarehouseFilter("");
+                      setSerialStageFilter("");
+                    }}
+                    className="text-caption text-primary hover:underline font-medium"
+                  >
+                    Reset Filters
+                  </button>
+                )}
+              </div>
+
+              {/* Serials Table */}
+              <div className="bg-surface rounded-md border border-border shadow-elevation-1 overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-page-bg/60 text-caption uppercase tracking-wider text-text-muted font-semibold">
+                      <th className="py-3 px-4">Serial & Barcode</th>
+                      <th className="py-3 px-4">Product Master & Model</th>
+                      <th className="py-3 px-4">Current Warehouse</th>
+                      <th className="py-3 px-4 text-center">Lifecycle Stage</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
-                  ) : (
-                    serials.map((s) => (
-                      <tr key={s.id} className="hover:bg-page-bg/40 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-ink">{s.serial}</td>
-                        <td className="py-3 px-4 font-medium text-ink">
-                          <div>{s.product?.name}</div>
-                          <span className="text-caption font-mono text-text-muted">{s.product?.sku}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2.5 py-0.5 rounded-full text-caption font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                            {s.currentStage}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => setInspectingSerial(s.serial)}
-                            className="inline-flex items-center gap-1 px-3 py-1 bg-surface hover:bg-page-bg border border-border rounded-sm text-caption font-medium text-ink shadow-elevation-1 transition-colors"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-primary" />
-                            <span>Audit Trail</span>
-                          </button>
+                  </thead>
+                  <tbody className="divide-y divide-border text-body">
+                    {serials.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-text-muted">
+                          <QrCode className="w-8 h-8 mx-auto mb-2 text-text-muted/60" />
+                          <p className="font-medium">No serial numbers found matching current criteria</p>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      serials.map((s) => (
+                        <tr key={s.id} className="hover:bg-page-bg/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <Barcode className="w-4 h-4 text-purple shrink-0" />
+                              <div>
+                                <span className="font-mono font-bold text-ink block">{s.serial}</span>
+                                {s.barcode && (
+                                  <span className="text-[11px] font-mono text-text-muted">
+                                    Barcode: {s.barcode}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-ink">{s.product?.name}</div>
+                            <div className="flex items-center gap-2 text-caption text-text-muted font-mono">
+                              <span>SKU: {s.product?.sku}</span>
+                              {(s.product as any)?.modelNumber && (
+                                <span>&bull; Model: {(s.product as any).modelNumber}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-caption font-medium text-ink">
+                            {s.warehouse?.name ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Warehouse className="w-3.5 h-3.5 text-text-muted" />
+                                {s.warehouse.name}
+                              </span>
+                            ) : s.currentStage === "SOLD" ? (
+                              <span className="text-text-muted italic">Customer Delivered</span>
+                            ) : (
+                              <span className="text-text-muted italic">Unassigned</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-caption font-semibold border ${
+                                s.currentStage === "IN_STOCK"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                  : s.currentStage === "SOLD"
+                                  ? "bg-indigo-100 text-indigo-800 border-indigo-200"
+                                  : s.currentStage === "RESERVED"
+                                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                                  : s.currentStage === "DAMAGED_WRITTEN_OFF"
+                                  ? "bg-rose-100 text-rose-800 border-rose-200"
+                                  : "bg-gray-100 text-gray-800 border-gray-200"
+                              }`}
+                            >
+                              {s.currentStage}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => setInspectingSerial(s.serial)}
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-surface hover:bg-page-bg border border-border rounded-sm text-caption font-medium text-ink shadow-elevation-1 transition-colors"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-primary" />
+                              <span>Audit Trail</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="bg-surface rounded-md border border-border shadow-elevation-1 overflow-hidden">

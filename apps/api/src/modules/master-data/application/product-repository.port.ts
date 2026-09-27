@@ -13,6 +13,9 @@ export interface ProductRecord {
   id: string;
   sku: string;
   name: string;
+  trackingType: "SERIALIZED" | "NON_SERIALIZED";
+  modelNumber?: string | null;
+  barcode?: string | null;
   categoryId: string | null;
   subCategoryId?: string | null;
   brandId: string | null;
@@ -32,6 +35,9 @@ export interface ProductRecord {
 export interface CreateProductInput {
   sku: string;
   name: string;
+  trackingType?: "SERIALIZED" | "NON_SERIALIZED";
+  modelNumber?: string;
+  barcode?: string;
   categoryId?: string;
   subCategoryId?: string;
   brandId?: string;
@@ -43,6 +49,9 @@ export interface CreateProductInput {
 
 export interface UpdateProductInput {
   name?: string;
+  trackingType?: "SERIALIZED" | "NON_SERIALIZED";
+  modelNumber?: string | null;
+  barcode?: string | null;
   categoryId?: string | null;
   subCategoryId?: string | null;
   brandId?: string | null;
@@ -57,6 +66,7 @@ export interface ProductListFilter {
   categoryId?: string;
   subCategoryId?: string;
   brandId?: string;
+  trackingType?: "SERIALIZED" | "NON_SERIALIZED";
   isActive?: boolean;
   isServiceItem?: boolean;
   search?: string;

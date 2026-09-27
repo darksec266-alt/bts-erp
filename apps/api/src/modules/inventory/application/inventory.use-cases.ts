@@ -13,6 +13,8 @@ import type {
   CreateDamageLossReportRequest,
   ApproveDamageLossReportRequest,
   InventoryStatsDto,
+  BarcodeScanRequest,
+  BarcodeScanResultDto,
 } from "../domain/inventory.types";
 import { PrismaInventoryRepository } from "../infrastructure/prisma-inventory-repository";
 
@@ -156,11 +158,24 @@ export class ListSerialNumbersUseCase {
 
   async execute(filters?: {
     productId?: string;
+    warehouseId?: string;
     stage?: string;
+    search?: string;
     skip?: number;
     take?: number;
   }): Promise<{ items: SerialNumberDto[]; total: number }> {
     return this.repo.listSerialNumbers(filters);
+  }
+}
+
+export class ScanBarcodeUseCase {
+  constructor(private readonly repo: PrismaInventoryRepository) {}
+
+  async execute(input: BarcodeScanRequest): Promise<BarcodeScanResultDto> {
+    if (!input.code || !input.code.trim()) {
+      throw new Error("code is required");
+    }
+    return this.repo.scanBarcode(input);
   }
 }
 

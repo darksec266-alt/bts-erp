@@ -19,13 +19,26 @@ export function createProductRouter(deps: {
   const router = Router();
 
   router.post("/products", requirePermission("masterData.manage"), async (req: Request, res: Response) => {
-    const { sku, name, categoryId, subCategoryId, brandId, unitId, costPrice, sellingPrice, isServiceItem } = req.body ?? {};
+    const { sku, name, categoryId, subCategoryId, brandId, unitId, costPrice, sellingPrice, isServiceItem, trackingType, modelNumber, barcode } = req.body ?? {};
     if (![sku, name, costPrice, sellingPrice].every((v) => typeof v === "string" && v.length > 0)) {
       sendError(res, 422, { code: "VALIDATION_ERROR", message: "sku, name, costPrice, and sellingPrice are required." });
       return;
     }
     try {
-      const product = await deps.createProductUseCase.execute({ sku, name, categoryId, subCategoryId, brandId, unitId, costPrice, sellingPrice, isServiceItem });
+      const product = await deps.createProductUseCase.execute({
+        sku,
+        name,
+        categoryId,
+        subCategoryId,
+        brandId,
+        unitId,
+        costPrice,
+        sellingPrice,
+        isServiceItem,
+        trackingType: trackingType === "SERIALIZED" ? "SERIALIZED" : "NON_SERIALIZED",
+        modelNumber: typeof modelNumber === "string" ? modelNumber : undefined,
+        barcode: typeof barcode === "string" ? barcode : undefined,
+      });
       sendData(res, product, 201);
     } catch (err: unknown) {
       if (err instanceof DuplicateKeyError) {
@@ -33,7 +46,7 @@ export function createProductRouter(deps: {
         return;
       }
       if (isPrismaUniqueConstraint(err)) {
-        sendError(res, 409, { code: "DUPLICATE_SKU", message: "A product with this SKU already exists." });
+        sendError(res, 409, { code: "DUPLICATE_SKU", message: "A product with this SKU or barcode already exists." });
         return;
       }
       const message = err instanceof Error ? err.message : "Failed to create product";
@@ -43,12 +56,13 @@ export function createProductRouter(deps: {
 
   router.get("/products", requirePermission("masterData.view", "masterData.manage"), async (req: Request, res: Response) => {
     try {
-      const { categoryId, subCategoryId, brandId, isActive, isServiceItem, search, skip, take } = req.query;
+      const { categoryId, subCategoryId, brandId, trackingType, isActive, isServiceItem, search, skip, take } = req.query;
       const result = await deps.listProductsUseCase.execute(
         {
           categoryId: typeof categoryId === "string" ? categoryId : undefined,
           subCategoryId: typeof subCategoryId === "string" ? subCategoryId : undefined,
           brandId: typeof brandId === "string" ? brandId : undefined,
+          trackingType: trackingType === "SERIALIZED" || trackingType === "NON_SERIALIZED" ? trackingType : undefined,
           isActive: isActive === "true" ? true : isActive === "false" ? false : undefined,
           isServiceItem: isServiceItem === "true" ? true : isServiceItem === "false" ? false : undefined,
           search: typeof search === "string" ? search : undefined,

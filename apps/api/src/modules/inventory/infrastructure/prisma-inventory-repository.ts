@@ -13,6 +13,8 @@ import type {
   CreateDamageLossReportRequest,
   InventoryStatsDto,
   DamageLossDisposition,
+  BarcodeScanRequest,
+  BarcodeScanResultDto,
 } from "../domain/inventory.types";
 
 // Structural typing for PrismaClient to avoid hard runtime dependency issues
@@ -258,6 +260,41 @@ export class PrismaInventoryRepository {
         },
       });
 
+      // 4. If product is SERIALIZED, transition physical units from source warehouse
+      if (transfer.product?.trackingType === "SERIALIZED" && tx.serialNumber) {
+        const unitsToTransfer = await tx.serialNumber.findMany({
+          where: {
+            productId: data.productId,
+            warehouseId: data.fromWarehouseId,
+            currentStage: "IN_STOCK",
+          },
+          take: Number(data.quantity),
+        });
+
+        for (const unit of unitsToTransfer) {
+          await tx.serialNumber.update({
+            where: { id: unit.id },
+            data: { currentStage: "RESERVED", notes: `In transit to warehouse ${data.toWarehouseId} via transfer ${transfer.id}` },
+          });
+
+          if (tx.sKULifecycleEvent) {
+            await tx.sKULifecycleEvent.create({
+              data: {
+                serialNumberId: unit.id,
+                eventType: "RESERVED",
+                sourceModule: "STOCK_TRANSFER",
+                sourceId: transfer.id,
+                fromWarehouseId: data.fromWarehouseId,
+                toWarehouseId: data.toWarehouseId,
+                fromStage: "IN_STOCK",
+                toStage: "RESERVED",
+                notes: `Dispatched in stock transfer ${transfer.id}`,
+              },
+            }).catch(() => {});
+          }
+        }
+      }
+
       const [fromWh, toWh] = await Promise.all([
         tx.warehouse.findUnique({ where: { id: data.fromWarehouseId } }),
         tx.warehouse.findUnique({ where: { id: data.toWarehouseId } }),
@@ -328,6 +365,41 @@ export class PrismaInventoryRepository {
           quantityOnHand: actualQty,
         },
       });
+
+      // If product is SERIALIZED, transition physical units into destination warehouse
+      if (transfer.product?.trackingType === "SERIALIZED" && tx.serialNumber) {
+        const unitsInTransit = await tx.serialNumber.findMany({
+          where: {
+            productId: transfer.productId,
+            warehouseId: transfer.fromWarehouseId,
+            currentStage: "RESERVED",
+          },
+          take: actualQty,
+        });
+
+        for (const unit of unitsInTransit) {
+          await tx.serialNumber.update({
+            where: { id: unit.id },
+            data: { currentStage: "IN_STOCK", warehouseId: transfer.toWarehouseId, notes: null },
+          });
+
+          if (tx.sKULifecycleEvent) {
+            await tx.sKULifecycleEvent.create({
+              data: {
+                serialNumberId: unit.id,
+                eventType: "IN_STOCK",
+                sourceModule: "STOCK_TRANSFER",
+                sourceId: transfer.id,
+                fromWarehouseId: transfer.fromWarehouseId,
+                toWarehouseId: transfer.toWarehouseId,
+                fromStage: "RESERVED",
+                toStage: "IN_STOCK",
+                notes: `Received at destination warehouse via transfer ${transfer.id}`,
+              },
+            }).catch(() => {});
+          }
+        }
+      }
 
       // Update transfer status
       const updated = await tx.stockTransfer.update({
@@ -463,9 +535,18 @@ export class PrismaInventoryRepository {
       data: {
         productId: data.productId,
         serial: data.serial,
+        barcode: data.barcode || null,
+        warehouseId: data.warehouseId || null,
+        purchaseOrderId: data.purchaseOrderId || null,
+        grnId: data.grnId || null,
+        grnLineId: data.grnLineId || null,
+        notes: data.notes || null,
         currentStage: data.currentStage || "RECEIVED",
       },
-      include: { product: true },
+      include: {
+        product: true,
+        warehouse: true,
+      },
     });
 
     // Record initial SKULifecycleEvent
@@ -475,6 +556,8 @@ export class PrismaInventoryRepository {
         eventType: serial.currentStage,
         sourceModule: "INVENTORY",
         sourceId: serial.id,
+        toWarehouseId: data.warehouseId || null,
+        toStage: serial.currentStage,
       },
     });
 
@@ -482,16 +565,43 @@ export class PrismaInventoryRepository {
       id: serial.id,
       productId: serial.productId,
       serial: serial.serial,
+      barcode: serial.barcode,
+      warehouseId: serial.warehouseId,
+      purchaseOrderId: serial.purchaseOrderId,
+      grnId: serial.grnId,
+      grnLineId: serial.grnLineId,
+      notes: serial.notes,
       currentStage: serial.currentStage as any,
-      product: serial.product ? { id: serial.product.id, sku: serial.product.sku, name: serial.product.name } : null,
+      createdAt: serial.createdAt,
+      updatedAt: serial.updatedAt,
+      product: serial.product
+        ? {
+            id: serial.product.id,
+            sku: serial.product.sku,
+            name: serial.product.name,
+            trackingType: serial.product.trackingType,
+            modelNumber: serial.product.modelNumber,
+            barcode: serial.product.barcode,
+          }
+        : null,
+      warehouse: serial.warehouse
+        ? {
+            id: serial.warehouse.id,
+            code: serial.warehouse.code,
+            name: serial.warehouse.name,
+          }
+        : null,
     };
   }
 
   async getSerialHistory(serial: string): Promise<SerialNumberDto | null> {
-    const record = await this.prisma.serialNumber.findUnique({
-      where: { serial },
+    const record = await this.prisma.serialNumber.findFirst({
+      where: {
+        OR: [{ serial }, { barcode: serial }, { id: serial }],
+      },
       include: {
         product: true,
+        warehouse: true,
         events: {
           orderBy: { occurredAt: "asc" },
         },
@@ -504,31 +614,80 @@ export class PrismaInventoryRepository {
       id: record.id,
       productId: record.productId,
       serial: record.serial,
+      barcode: record.barcode,
+      warehouseId: record.warehouseId,
+      purchaseOrderId: record.purchaseOrderId,
+      grnId: record.grnId,
+      grnLineId: record.grnLineId,
+      notes: record.notes,
       currentStage: record.currentStage as any,
-      product: record.product ? { id: record.product.id, sku: record.product.sku, name: record.product.name } : null,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      product: record.product
+        ? {
+            id: record.product.id,
+            sku: record.product.sku,
+            name: record.product.name,
+            trackingType: record.product.trackingType,
+            modelNumber: record.product.modelNumber,
+            barcode: record.product.barcode,
+          }
+        : null,
+      warehouse: record.warehouse
+        ? {
+            id: record.warehouse.id,
+            code: record.warehouse.code,
+            name: record.warehouse.name,
+          }
+        : null,
       events: record.events.map((e: any) => ({
         id: e.id,
         serialNumberId: e.serialNumberId,
         eventType: e.eventType,
         sourceModule: e.sourceModule,
         sourceId: e.sourceId,
+        fromWarehouseId: e.fromWarehouseId,
+        toWarehouseId: e.toWarehouseId,
+        fromStage: e.fromStage,
+        toStage: e.toStage,
+        notes: e.notes,
+        performedById: e.performedById,
         occurredAt: e.occurredAt,
       })),
     };
   }
 
-  async listSerialNumbers(filters?: { productId?: string; stage?: string; skip?: number; take?: number }): Promise<{ items: SerialNumberDto[]; total: number }> {
+  async listSerialNumbers(filters?: {
+    productId?: string;
+    warehouseId?: string;
+    stage?: string;
+    search?: string;
+    skip?: number;
+    take?: number;
+  }): Promise<{ items: SerialNumberDto[]; total: number }> {
     const where: Record<string, unknown> = {};
     if (filters?.productId) where.productId = filters.productId;
+    if (filters?.warehouseId) where.warehouseId = filters.warehouseId;
     if (filters?.stage) where.currentStage = filters.stage;
+    if (filters?.search) {
+      where.OR = [
+        { serial: { contains: filters.search, mode: "insensitive" } },
+        { barcode: { contains: filters.search, mode: "insensitive" } },
+        { product: { name: { contains: filters.search, mode: "insensitive" } } },
+        { product: { sku: { contains: filters.search, mode: "insensitive" } } },
+      ];
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.serialNumber.findMany({
         where,
-        include: { product: true },
+        include: {
+          product: true,
+          warehouse: true,
+        },
         skip: filters?.skip || 0,
         take: filters?.take || 50,
-        orderBy: { serial: "asc" },
+        orderBy: { updatedAt: "desc" },
       }),
       this.prisma.serialNumber.count({ where }),
     ]);
@@ -538,10 +697,238 @@ export class PrismaInventoryRepository {
         id: s.id,
         productId: s.productId,
         serial: s.serial,
+        barcode: s.barcode,
+        warehouseId: s.warehouseId,
+        purchaseOrderId: s.purchaseOrderId,
+        grnId: s.grnId,
+        grnLineId: s.grnLineId,
+        notes: s.notes,
         currentStage: s.currentStage as any,
-        product: s.product ? { id: s.product.id, sku: s.product.sku, name: s.product.name } : null,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+        product: s.product
+          ? {
+              id: s.product.id,
+              sku: s.product.sku,
+              name: s.product.name,
+              trackingType: s.product.trackingType,
+              modelNumber: s.product.modelNumber,
+              barcode: s.product.barcode,
+            }
+          : null,
+        warehouse: s.warehouse
+          ? {
+              id: s.warehouse.id,
+              code: s.warehouse.code,
+              name: s.warehouse.name,
+            }
+          : null,
       })),
       total,
+    };
+  }
+
+  async scanBarcode(request: BarcodeScanRequest): Promise<BarcodeScanResultDto> {
+    const code = (request.code || "").trim();
+    if (!code) {
+      return {
+        matchedType: "UNKNOWN",
+        query: code,
+        isValid: false,
+        validationMessage: "Barcode or code cannot be empty",
+      };
+    }
+
+    // 1. Check if code matches an individual SerialNumber unit (by serial or barcode)
+    const serialRecord = await this.prisma.serialNumber.findFirst({
+      where: {
+        OR: [{ serial: code }, { barcode: code }],
+      },
+      include: {
+        product: {
+          include: {
+            category: true,
+          },
+        },
+        warehouse: true,
+      },
+    });
+
+    if (serialRecord) {
+      let isValid = true;
+      let validationMessage: string | undefined;
+
+      const op = request.intendedOperation;
+      if (op === "RECEIVE") {
+        if (serialRecord.currentStage === "IN_STOCK") {
+          isValid = false;
+          validationMessage = `Unit ${serialRecord.serial} is already in stock in warehouse "${serialRecord.warehouse?.name || 'Unknown'}"`;
+        }
+      } else if (op === "DISPATCH" || op === "SELL") {
+        if (serialRecord.currentStage !== "IN_STOCK") {
+          isValid = false;
+          validationMessage = `Unit ${serialRecord.serial} is in stage "${serialRecord.currentStage}" (must be IN_STOCK)`;
+        } else if (request.warehouseId && serialRecord.warehouseId && serialRecord.warehouseId !== request.warehouseId) {
+          isValid = false;
+          validationMessage = `Unit ${serialRecord.serial} is located in warehouse "${serialRecord.warehouse?.name || serialRecord.warehouseId}", not in current selected warehouse`;
+        }
+      } else if (op === "TRANSFER") {
+        if (serialRecord.currentStage !== "IN_STOCK") {
+          isValid = false;
+          validationMessage = `Unit ${serialRecord.serial} cannot be transferred because it is in stage "${serialRecord.currentStage}"`;
+        } else if (request.warehouseId && serialRecord.warehouseId && serialRecord.warehouseId !== request.warehouseId) {
+          isValid = false;
+          validationMessage = `Unit ${serialRecord.serial} is not in the source warehouse`;
+        }
+      }
+
+      const unitPayload = {
+        id: serialRecord.id,
+        serial: serialRecord.serial,
+        barcode: serialRecord.barcode,
+        currentStage: serialRecord.currentStage as any,
+        warehouseId: serialRecord.warehouseId,
+        warehouseName: serialRecord.warehouse?.name || null,
+        warehouse: serialRecord.warehouse ? { id: serialRecord.warehouse.id, name: serialRecord.warehouse.name } : null,
+        notes: serialRecord.notes,
+      };
+
+      return {
+        found: true,
+        matchedType: "SERIALIZED_UNIT",
+        trackingType: "SERIALIZED",
+        query: code,
+        isValid,
+        validationMessage,
+        product: serialRecord.product
+          ? {
+              id: serialRecord.product.id,
+              sku: serialRecord.product.sku,
+              name: serialRecord.product.name,
+              trackingType: "SERIALIZED",
+              modelNumber: serialRecord.product.modelNumber ?? null,
+              barcode: serialRecord.product.barcode ?? null,
+              costPrice: serialRecord.product.costPrice?.toString(),
+              sellingPrice: serialRecord.product.sellingPrice?.toString(),
+              category: serialRecord.product.category
+                ? { id: serialRecord.product.category.id, name: serialRecord.product.category.name }
+                : null,
+            }
+          : null,
+        unit: unitPayload,
+        serialNumber: unitPayload,
+        availableStock: serialRecord.currentStage === "IN_STOCK" ? 1 : 0,
+        availableStockInWarehouse: serialRecord.currentStage === "IN_STOCK" ? 1 : 0,
+      };
+    }
+
+    // 2. Not found as SerialNumber -> check Product (by barcode, sku, or modelNumber)
+    const productRecord = await this.prisma.product.findFirst({
+      where: {
+        OR: [{ barcode: code }, { sku: code }, { modelNumber: code }],
+      },
+      include: {
+        category: true,
+        stockLedgers: true,
+      },
+    });
+
+    if (productRecord) {
+      const isSerialized = productRecord.trackingType === "SERIALIZED";
+
+      let availableStock = 0;
+      if (request.warehouseId) {
+        const sl = (productRecord.stockLedgers || []).find((l: any) => l.warehouseId === request.warehouseId);
+        availableStock = sl ? Number(sl.quantityOnHand) : 0;
+      } else {
+        availableStock = (productRecord.stockLedgers || []).reduce(
+          (sum: number, l: any) => sum + Number(l.quantityOnHand),
+          0
+        );
+      }
+
+      if (isSerialized) {
+        const isValid = request.intendedOperation === "RECEIVE";
+        const validationMessage = `This is product model "${productRecord.name}" (${productRecord.sku}). For physical tracking, please scan or paste the individual unit serial number or barcode.`;
+
+        return {
+          found: true,
+          matchedType: "SERIALIZED_UNIT",
+          trackingType: "SERIALIZED",
+          query: code,
+          isValid,
+          validationMessage,
+          product: {
+            id: productRecord.id,
+            sku: productRecord.sku,
+            name: productRecord.name,
+            trackingType: "SERIALIZED",
+            modelNumber: productRecord.modelNumber ?? null,
+            barcode: productRecord.barcode ?? null,
+            costPrice: productRecord.costPrice?.toString(),
+            sellingPrice: productRecord.sellingPrice?.toString(),
+            category: productRecord.category
+              ? { id: productRecord.category.id, name: productRecord.category.name }
+              : null,
+          },
+          unit: null,
+          serialNumber: null,
+          availableStock,
+          availableStockInWarehouse: availableStock,
+        };
+      }
+
+      // Bulk Non-Serialized Product
+      let isValid = true;
+      let validationMessage: string | undefined;
+
+      if (request.intendedOperation === "DISPATCH" || request.intendedOperation === "SELL") {
+        if (availableStock <= 0) {
+          isValid = false;
+          validationMessage = `Product "${productRecord.name}" has 0 quantity on hand in the selected warehouse`;
+        }
+      }
+
+      return {
+        found: true,
+        matchedType: "BULK_PRODUCT",
+        trackingType: "NON_SERIALIZED",
+        query: code,
+        isValid,
+        validationMessage,
+        product: {
+          id: productRecord.id,
+          sku: productRecord.sku,
+          name: productRecord.name,
+          trackingType: "NON_SERIALIZED",
+          modelNumber: productRecord.modelNumber ?? null,
+          barcode: productRecord.barcode ?? null,
+          costPrice: productRecord.costPrice?.toString(),
+          sellingPrice: productRecord.sellingPrice?.toString(),
+          category: productRecord.category
+            ? { id: productRecord.category.id, name: productRecord.category.name }
+            : null,
+        },
+        unit: null,
+        serialNumber: null,
+        availableStock,
+        availableStockInWarehouse: availableStock,
+      };
+    }
+
+    // 3. Not found
+    return {
+      found: false,
+      matchedType: "UNKNOWN",
+      trackingType: undefined,
+      query: code,
+      isValid: false,
+      validationMessage: `Barcode or serial number "${code}" not found in system`,
+      product: null,
+      unit: null,
+      serialNumber: null,
+      availableStock: 0,
+      availableStockInWarehouse: 0,
     };
   }
 

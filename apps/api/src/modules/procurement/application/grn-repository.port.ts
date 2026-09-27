@@ -13,6 +13,7 @@ export interface GrnLineInput {
   condition: "GOOD" | "DAMAGED" | "SHORT" | "WRONG_SKU";
   serialNumberId?: string;
   batchId?: string;
+  serials?: Array<string | { serial: string; barcode?: string; notes?: string }>;
 }
 
 export interface GrnRecord {
