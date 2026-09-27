@@ -515,3 +515,57 @@ export class GetBankTransactionProofUseCase {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Sales Return Use Cases
+// ═══════════════════════════════════════════════════════════════
+
+export class CreateSalesReturnUseCase {
+  constructor(private readonly repo: SalesRepositoryPort) {}
+
+  async execute(
+    input: import("../domain/sales.types").CreateSalesReturnInput,
+    userId?: string
+  ): Promise<import("../domain/sales.types").SalesReturnEntity> {
+    if (!input.invoiceId) {
+      throw new Error("Invoice ID is required for return.");
+    }
+    if (!input.warehouseId) {
+      throw new Error("Receiving warehouse is required for return.");
+    }
+    if (!input.lines || input.lines.length === 0) {
+      throw new Error("At least one line item must be selected for return.");
+    }
+    return this.repo.createSalesReturn(input, userId);
+  }
+}
+
+export class GetSalesReturnUseCase {
+  constructor(private readonly repo: SalesRepositoryPort) {}
+
+  async execute(id: string): Promise<import("../domain/sales.types").SalesReturnEntity | null> {
+    if (!id) throw new Error("Return ID is required.");
+    return this.repo.getSalesReturnById(id);
+  }
+}
+
+export class ListSalesReturnsUseCase {
+  constructor(private readonly repo: SalesRepositoryPort) {}
+
+  async execute(
+    filter?: { invoiceId?: string; customerId?: string; branchId?: string },
+    pagination?: Pagination
+  ): Promise<{ items: import("../domain/sales.types").SalesReturnEntity[]; total: number }> {
+    return this.repo.listSalesReturns(filter, pagination);
+  }
+}
+
+export class GetInvoiceReturnableItemsUseCase {
+  constructor(private readonly repo: SalesRepositoryPort) {}
+
+  async execute(invoiceId: string) {
+    if (!invoiceId) throw new Error("Invoice ID is required.");
+    return this.repo.getInvoiceReturnableItems(invoiceId);
+  }
+}
+
+

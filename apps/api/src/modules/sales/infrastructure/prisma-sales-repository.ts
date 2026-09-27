@@ -2867,5 +2867,405 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       uploadedAt: row.uploadedAt,
     };
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Sales Returns & Inventory Restorations
+  // ═══════════════════════════════════════════════════════════════
+
+  private mapSalesReturn(row: AnyPrisma): import("../domain/sales.types").SalesReturnEntity {
+    return {
+      id: row.id,
+      returnNumber: row.returnNumber,
+      invoiceId: row.invoiceId,
+      customerId: row.customerId,
+      branchId: row.branchId,
+      warehouseId: row.warehouseId,
+      totalAmount: toNumber(row.totalAmount),
+      creditToWallet: Boolean(row.creditToWallet),
+      refundAmount: toNumber(row.refundAmount),
+      reason: row.reason,
+      status: row.status,
+      createdAt: row.createdAt,
+      invoice: row.invoice
+        ? {
+            id: row.invoice.id,
+            invoiceNumber: row.invoice.invoiceNumber,
+            grandTotal: toNumber(row.invoice.grandTotal),
+          }
+        : undefined,
+      customer: row.customer
+        ? {
+            id: row.customer.id,
+            customerCode: row.customer.customerCode,
+            displayName: row.customer.displayName,
+          }
+        : undefined,
+      warehouse: row.warehouse
+        ? {
+            id: row.warehouse.id,
+            code: row.warehouse.code,
+            name: row.warehouse.name,
+          }
+        : undefined,
+      lines: (row.lines || []).map((l: AnyPrisma) => ({
+        id: l.id,
+        salesReturnId: l.salesReturnId,
+        productId: l.productId,
+        quantity: toNumber(l.quantity),
+        unitPrice: toNumber(l.unitPrice),
+        lineTotal: toNumber(l.lineTotal),
+        serials: l.serials || [],
+        product: l.product
+          ? {
+              id: l.product.id,
+              sku: l.product.sku,
+              name: l.product.name,
+              trackingType: l.product.trackingType || "NON_SERIALIZED",
+              modelNumber: l.product.modelNumber ?? null,
+            }
+          : undefined,
+      })),
+    };
+  }
+
+  async getInvoiceReturnableItems(invoiceId: string) {
+    const invoice = await this.getInvoiceById(invoiceId);
+    if (!invoice) {
+      throw new Error(`Invoice ${invoiceId} not found.`);
+    }
+
+    // Existing returns for this invoice
+    const existingReturns = await this.prisma.salesReturn.findMany({
+      where: { invoiceId },
+      include: { lines: true },
+    });
+
+    const alreadyReturnedMap = new Map<string, number>();
+    const returnedSerialsSet = new Set<string>();
+
+    for (const ret of existingReturns) {
+      for (const line of ret.lines) {
+        alreadyReturnedMap.set(
+          line.productId,
+          (alreadyReturnedMap.get(line.productId) || 0) + toNumber(line.quantity)
+        );
+        for (const s of line.serials || []) {
+          returnedSerialsSet.add(s);
+        }
+      }
+    }
+
+    // Find sold serial units for this invoice
+    const soldEvents = await this.prisma.sKULifecycleEvent.findMany({
+      where: {
+        sourceId: invoiceId,
+        eventType: "SOLD",
+      },
+      include: {
+        serialNumber: {
+          include: { product: true },
+        },
+      },
+    });
+
+    const soldSerialsByProduct = new Map<string, string[]>();
+    for (const evt of soldEvents) {
+      if (evt.serialNumber && !returnedSerialsSet.has(evt.serialNumber.serial)) {
+        const prodId = evt.serialNumber.productId;
+        const list = soldSerialsByProduct.get(prodId) || [];
+        list.push(evt.serialNumber.serial);
+        soldSerialsByProduct.set(prodId, list);
+      }
+    }
+
+    // Map invoice lines
+    const items = (invoice.lines || []).map((line) => {
+      const alreadyReturned = alreadyReturnedMap.get(line.productId || "") || 0;
+      const returnable = Math.max(0, line.quantity - alreadyReturned);
+      const candidateSerials = soldSerialsByProduct.get(line.productId || "") || [];
+
+      return {
+        productId: line.productId || "",
+        productName: line.productName,
+        sku: line.sku,
+        trackingType: (candidateSerials.length > 0 ? "SERIALIZED" : "NON_SERIALIZED") as "SERIALIZED" | "NON_SERIALIZED",
+        invoicedQuantity: line.quantity,
+        alreadyReturnedQuantity: alreadyReturned,
+        returnableQuantity: returnable,
+        unitPrice: line.unitPrice,
+        soldSerials: candidateSerials,
+      };
+    });
+
+    // Check actual products in database to ensure trackingType is 100% accurate
+    const productIds = items.map((i) => i.productId).filter(Boolean);
+    if (productIds.length > 0) {
+      const prods = await this.prisma.product.findMany({
+        where: { id: { in: productIds } },
+      });
+      const prodMap = new Map(prods.map((p) => [p.id, p]));
+      for (const item of items) {
+        const p = prodMap.get(item.productId);
+        if (p) {
+          item.trackingType = (p.trackingType as any) || "NON_SERIALIZED";
+        }
+      }
+    }
+
+    return { invoice, items };
+  }
+
+  async createSalesReturn(
+    data: import("../domain/sales.types").CreateSalesReturnInput,
+    userId?: string
+  ): Promise<import("../domain/sales.types").SalesReturnEntity> {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: data.invoiceId },
+      include: {
+        customer: true,
+        branch: true,
+      },
+    });
+
+    if (!invoice) {
+      throw new Error(`Invoice ${data.invoiceId} not found.`);
+    }
+
+    if (invoice.status === "CANCELLED") {
+      throw new Error("Cannot return items against a cancelled invoice.");
+    }
+
+    if (!data.lines || data.lines.length === 0) {
+      throw new Error("At least one line item must be selected for return.");
+    }
+
+    // Verify warehouse
+    const warehouse = await this.prisma.warehouse.findUnique({
+      where: { id: data.warehouseId },
+    });
+    if (!warehouse) {
+      throw new Error(`Warehouse ${data.warehouseId} not found.`);
+    }
+
+    // Check returnable items
+    const { items: returnableItems } = await this.getInvoiceReturnableItems(data.invoiceId);
+    const returnableMap = new Map(returnableItems.map((i) => [i.productId, i]));
+
+    let totalAmount = 0;
+    for (const line of data.lines) {
+      const retInfo = returnableMap.get(line.productId);
+      if (!retInfo) {
+        throw new Error(`Product ${line.productId} was not found on Invoice ${invoice.invoiceNumber}.`);
+      }
+      if (line.quantity <= 0) {
+        throw new Error(`Return quantity for ${retInfo.productName} must be greater than zero.`);
+      }
+      if (line.quantity > retInfo.returnableQuantity) {
+        throw new Error(
+          `Return quantity (${line.quantity}) for "${retInfo.productName}" exceeds available returnable quantity (${retInfo.returnableQuantity}).`
+        );
+      }
+
+      // If serialized, validate serial numbers
+      if (retInfo.trackingType === "SERIALIZED") {
+        const serials = line.serials || [];
+        if (serials.length !== line.quantity) {
+          throw new Error(
+            `"${retInfo.productName}" is a serialized item. Exactly ${line.quantity} serial number(s) must be provided (received ${serials.length}).`
+          );
+        }
+        for (const s of serials) {
+          const unit = await this.prisma.serialNumber.findUnique({ where: { serial: s } });
+          if (!unit) {
+            throw new Error(`Serial number "${s}" does not exist in the system.`);
+          }
+          if (unit.productId !== line.productId) {
+            throw new Error(`Serial number "${s}" does not belong to product "${retInfo.productName}".`);
+          }
+          if (unit.currentStage !== "SOLD") {
+            throw new Error(`Serial number "${s}" is not currently in SOLD status (current: ${unit.currentStage}).`);
+          }
+        }
+      }
+
+      totalAmount += Number((line.quantity * line.unitPrice).toFixed(2));
+    }
+
+    totalAmount = Number(totalAmount.toFixed(2));
+    const returnNumber = `RET-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      // 1. Create SalesReturn record
+      const createdReturn = await tx.salesReturn.create({
+        data: {
+          returnNumber,
+          invoiceId: invoice.id,
+          customerId: invoice.customerId,
+          branchId: invoice.branchId,
+          warehouseId: data.warehouseId,
+          totalAmount,
+          creditToWallet: data.creditToWallet ?? true,
+          refundAmount: totalAmount,
+          reason: data.reason || "Customer Return",
+          status: "COMPLETED",
+          createdById: userId || null,
+          lines: {
+            create: data.lines.map((l) => ({
+              productId: l.productId,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              lineTotal: Number((l.quantity * l.unitPrice).toFixed(2)),
+              serials: l.serials || [],
+            })),
+          },
+        },
+        include: {
+          invoice: true,
+          customer: true,
+          warehouse: true,
+          lines: {
+            include: { product: true },
+          },
+        },
+      });
+
+      // 2. Create Credit Note linked to invoice
+      await tx.creditNote.create({
+        data: {
+          creditNoteNumber: `CN-${returnNumber}`,
+          invoiceId: invoice.id,
+          amount: totalAmount,
+          reason: `Sales Return #${returnNumber}${data.reason ? ": " + data.reason : ""}`,
+        },
+      });
+
+      // 3. Credit to Customer Wallet if requested (User requirement: "Tk customer er wallet a add hobe")
+      if (data.creditToWallet ?? true) {
+        const updatedCustomer = await tx.customer.update({
+          where: { id: invoice.customerId },
+          data: {
+            walletBalance: { increment: totalAmount },
+          },
+        });
+
+        await tx.customerWalletTransaction.create({
+          data: {
+            customerId: invoice.customerId,
+            amount: totalAmount,
+            type: "SALES_RETURN_REFUND",
+            referenceType: "SALES_RETURN",
+            referenceId: createdReturn.id,
+            balanceAfter: updatedCustomer.walletBalance,
+            notes: `Refund from Sales Return #${returnNumber} for Invoice #${invoice.invoiceNumber}`,
+            createdById: userId || null,
+          },
+        });
+      }
+
+      // 4. Restore Inventory (User requirement: "Products inventory te add hoye jabe")
+      for (const line of data.lines) {
+        const prod = await tx.product.findUnique({ where: { id: line.productId } });
+        const isSerialized = prod?.trackingType === "SERIALIZED";
+
+        // Increment stock ledger
+        await tx.stockLedger.upsert({
+          where: {
+            productId_warehouseId: {
+              productId: line.productId,
+              warehouseId: data.warehouseId,
+            },
+          },
+          create: {
+            productId: line.productId,
+            warehouseId: data.warehouseId,
+            quantityOnHand: line.quantity,
+          },
+          update: {
+            quantityOnHand: { increment: line.quantity },
+          },
+        });
+
+        // If serialized, transition each serial back to IN_STOCK at the warehouse
+        if (isSerialized && line.serials && line.serials.length > 0) {
+          for (const s of line.serials) {
+            const unit = await tx.serialNumber.update({
+              where: { serial: s },
+              data: {
+                currentStage: "IN_STOCK",
+                warehouseId: data.warehouseId,
+              },
+            });
+
+            await tx.sKULifecycleEvent.create({
+              data: {
+                serialNumberId: unit.id,
+                eventType: "RETURNED_BY_CUSTOMER",
+                sourceModule: "SALES_RETURN",
+                sourceId: createdReturn.id,
+                fromStage: "SOLD",
+                toStage: "IN_STOCK",
+                toWarehouseId: data.warehouseId,
+                notes: `Restored to stock via Sales Return #${returnNumber}`,
+                performedById: userId || null,
+              },
+            });
+          }
+        }
+      }
+
+      return createdReturn;
+    });
+
+    return this.mapSalesReturn(row);
+  }
+
+  async getSalesReturnById(id: string): Promise<import("../domain/sales.types").SalesReturnEntity | null> {
+    const row = await this.prisma.salesReturn.findUnique({
+      where: { id },
+      include: {
+        invoice: true,
+        customer: true,
+        warehouse: true,
+        lines: {
+          include: { product: true },
+        },
+      },
+    });
+    if (!row) return null;
+    return this.mapSalesReturn(row);
+  }
+
+  async listSalesReturns(
+    filter?: { invoiceId?: string; customerId?: string; branchId?: string },
+    pagination?: Pagination
+  ): Promise<{ items: import("../domain/sales.types").SalesReturnEntity[]; total: number }> {
+    const where: AnyPrisma = {};
+    if (filter?.invoiceId) where.invoiceId = filter.invoiceId;
+    if (filter?.customerId) where.customerId = filter.customerId;
+    if (filter?.branchId) where.branchId = filter.branchId;
+
+    const [rows, total] = await Promise.all([
+      this.prisma.salesReturn.findMany({
+        where,
+        include: {
+          invoice: true,
+          customer: true,
+          warehouse: true,
+          lines: {
+            include: { product: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: pagination?.skip ?? 0,
+        take: pagination?.take ?? 50,
+      }),
+      this.prisma.salesReturn.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((r) => this.mapSalesReturn(r)),
+      total,
+    };
+  }
 }
 
