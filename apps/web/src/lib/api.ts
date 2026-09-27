@@ -8,6 +8,7 @@ import type {
   CustomerWalletTransactionDto,
   SalesReturnDto,
   CreateSalesReturnRequest,
+  InvoiceReturnableItemsDto,
   BranchDto,
   QuotationDto,
   CreateQuotationRequest,
@@ -578,21 +579,8 @@ class ApiService {
   // -------------------------------------------------------------
   // Sales Returns & Customer Wallet
   // -------------------------------------------------------------
-  public async getInvoiceReturnableItems(invoiceId: string): Promise<{
-    invoice: InvoiceDto;
-    items: {
-      productId: string;
-      productName: string;
-      sku: string;
-      trackingType: "SERIALIZED" | "NON_SERIALIZED";
-      invoicedQuantity: number;
-      alreadyReturnedQuantity: number;
-      returnableQuantity: number;
-      unitPrice: number;
-      soldSerials: string[];
-    }[];
-  }> {
-    return this.request(`/sales/invoices/${invoiceId}/returnable-items`);
+  public async getInvoiceReturnableItems(invoiceId: string): Promise<InvoiceReturnableItemsDto> {
+    return this.request<InvoiceReturnableItemsDto>(`/sales/invoices/${invoiceId}/returnable-items`);
   }
 
   public async createSalesReturn(data: CreateSalesReturnRequest): Promise<SalesReturnDto> {

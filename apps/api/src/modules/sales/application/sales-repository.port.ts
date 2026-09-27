@@ -161,6 +161,12 @@ export interface SalesRepositoryPort {
       unitPrice: number;
       soldSerials: string[];
     }[];
+    financials?: {
+      grandTotal: number;
+      totalPaid: number;
+      alreadyReturnedAmount: number;
+      currentDue: number;
+    };
   }>;
 }
 

@@ -572,73 +572,70 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Header & Main Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-h1 text-ink font-bold tracking-tight">Sales & Project Delivery</h1>
-          <p className="text-body text-text-muted mt-1">
-            Price quotations, sales orders, continuous shipment delivery challans, and consolidated commercial billing.
-          </p>
+          <h1 className="text-h1 text-ink font-bold tracking-tight">Sales</h1>
+          <p className="text-[13px] text-text-muted mt-0.5">Quotations, orders, challans, invoices, and payments.</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            title="Refresh database records"
-            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50 shadow-elevation-1"
+            title="Refresh"
+            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-primary" : ""}`} />
           </button>
 
           <button
             onClick={handleExportCsv}
-            className="px-3.5 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-body font-medium text-ink flex items-center gap-2 transition-colors shadow-elevation-1"
+            className="px-3 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-[13px] font-medium text-ink flex items-center gap-1.5 transition-colors"
           >
-            <Download className="w-4 h-4 text-text-muted" />
-            <span>Export CSV</span>
+            <Download className="w-3.5 h-3.5 text-text-muted" />
+            Export
           </button>
 
-          {/* Quick Direct Counter Sale */}
           <button
             onClick={() => setDirectSaleModalOpen(true)}
-            className="px-4 py-2 rounded-sm bg-amber-600 hover:bg-amber-700 text-white text-body font-semibold flex items-center gap-2 shadow-sm transition-all"
-            title="Perform an immediate counter direct sale with instant invoice"
+            className="px-3.5 py-2 rounded-sm bg-amber-600 hover:bg-amber-700 text-white text-[13px] font-semibold flex items-center gap-1.5 transition-colors"
+            title="Counter direct sale with instant invoice"
           >
-            <Zap className="w-4 h-4 fill-white" />
-            <span>Direct Sale (Instant Bill)</span>
+            <Zap className="w-3.5 h-3.5 fill-white" />
+            Direct Sale
           </button>
 
           {activeTab === "quotations" && (
             <button
               onClick={() => setCreateQuoteModalOpen(true)}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>New Quotation</span>
+              <Plus className="w-3.5 h-3.5" />
+              New Quotation
             </button>
           )}
 
           {activeTab === "orders" && (
             <button
               onClick={() => setCreateOrderModalOpen(true)}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Direct Order</span>
+              <Plus className="w-3.5 h-3.5" />
+              New Order
             </button>
           )}
 
           {activeTab === "projects" && (
             <button
               onClick={() => setCreateProjectModalOpen(true)}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>New Project</span>
+              <Plus className="w-3.5 h-3.5" />
+              New Project
             </button>
           )}
 
@@ -648,20 +645,20 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
                 setPreSelectedOrderForInvoice(undefined);
                 setCreateInvoiceModalOpen(true);
               }}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Create Consolidated Bill</span>
+              <Plus className="w-3.5 h-3.5" />
+              New Invoice
             </button>
           )}
 
           {activeTab === "advances" && (
             <button
               onClick={() => setCreateAdvanceModalOpen(true)}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Record Customer Advance</span>
+              <Plus className="w-3.5 h-3.5" />
+              Record Advance
             </button>
           )}
 
@@ -671,10 +668,10 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
                 setDefaultInvoiceForPayment(undefined);
                 setRecordPaymentModalOpen(true);
               }}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Record Payment / Receipt</span>
+              <Plus className="w-3.5 h-3.5" />
+              Record Payment
             </button>
           )}
 
@@ -684,10 +681,10 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
                 setDefaultInvoiceForCreditNote(undefined);
                 setCreateCreditNoteModalOpen(true);
               }}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Issue Credit Note</span>
+              <Plus className="w-3.5 h-3.5" />
+              Issue Credit Note
             </button>
           )}
 
@@ -697,226 +694,80 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
                 setDefaultChallanForReturn(null);
                 setCreateChallanReturnModalOpen(true);
               }}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Record Challan Return</span>
+              <Plus className="w-3.5 h-3.5" />
+              Record Return
             </button>
           )}
         </div>
       </div>
 
-      {/* KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Revenue */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Total Revenue
-            </span>
-            <div className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
-              ৳{stats.totalRevenue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
-            </div>
-            <span className="text-[12px] text-success font-medium mt-0.5 block flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" /> Confirmed Sales
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-success-tint flex items-center justify-center text-success">
-            <CreditCard className="w-6 h-6" />
-          </div>
+      {/* KPI Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Revenue</p>
+          <p className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
+            ৳{stats.totalRevenue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+          </p>
+          <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3" /> Confirmed
+          </p>
         </div>
 
-        {/* Confirmed Orders */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Sales Orders
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {stats.totalOrders}
-            </div>
-            <span className="text-[12px] text-text-muted mt-0.5 block">Ready for fulfillment</span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-primary-tint flex items-center justify-center text-primary">
-            <ShoppingCart className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Orders</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalOrders}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Active</p>
         </div>
 
-        {/* Delivery Challans */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Delivery Challans
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {stats.dispatchedChallans}
-            </div>
-            <span className="text-[12px] text-warning font-medium mt-0.5 block">
-              {stats.unbilledChallans !== undefined ? `${stats.unbilledChallans} Unbilled Pending` : "Dispatched shipments"}
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-purple-tint flex items-center justify-center text-purple">
-            <Truck className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Challans</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.dispatchedChallans}</p>
+          <p className="text-[11px] text-warning font-medium mt-0.5">
+            {stats.unbilledChallans !== undefined ? `${stats.unbilledChallans} unbilled` : "Dispatched"}
+          </p>
         </div>
 
-        {/* Commercial Invoices */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Commercial Bills
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {stats.totalInvoices ?? invoicesTotal}
-            </div>
-            <span className="text-[12px] text-primary font-medium mt-0.5 block">
-              Consolidated Invoices
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-primary-tint flex items-center justify-center text-primary">
-            <FileCheck className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Invoices</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalInvoices ?? invoicesTotal}</p>
+          <p className="text-[11px] text-primary font-medium mt-0.5">Commercial</p>
         </div>
       </div>
 
-      {/* Tabs & Filter Bar */}
-      <div className="space-y-4">
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-border bg-surface px-4 rounded-t-md overflow-x-auto">
-          <button
-            onClick={() => handleTabChange("quotations")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "quotations"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Commercial Quotations</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {quotationsTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("orders")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "orders"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <ShoppingCart className="w-4 h-4" />
-            <span>Sales Orders</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {ordersTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("projects")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "projects"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <Briefcase className="w-4 h-4" />
-            <span>Project Sales & Site Challans</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {projectsTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("challans")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "challans"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <Truck className="w-4 h-4" />
-            <span>Delivery Challans</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {challansTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("invoices")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "invoices"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <FileCheck className="w-4 h-4" />
-            <span>Invoices & Billing</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {invoicesTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("advances")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "advances"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <ArrowDownLeft className="w-4 h-4" />
-            <span>Customer Advances</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {advancesTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("payments")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "payments"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            <span>Payments & Receipts</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {paymentsTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("credit-notes")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "credit-notes"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <FileMinus className="w-4 h-4" />
-            <span>Credit Notes</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {creditNotesTotal}
-            </span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange("returns")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "returns"
-                ? "border-primary text-primary font-semibold"
-                : "border-transparent text-text-muted hover:text-ink"
-            }`}
-          >
-            <Undo2 className="w-4 h-4" />
-            <span>Challan Returns</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
-              {challanReturnsTotal}
-            </span>
-          </button>
+      {/* Tab bar + Filters */}
+      <div className="space-y-0">
+        <div className="flex border-b border-border bg-surface px-3 rounded-t-sm overflow-x-auto">
+          {([
+            { key: "quotations", label: "Quotations", icon: FileText, count: quotationsTotal },
+            { key: "orders", label: "Orders", icon: ShoppingCart, count: ordersTotal },
+            { key: "projects", label: "Projects", icon: Briefcase, count: projectsTotal },
+            { key: "challans", label: "Challans", icon: Truck, count: challansTotal },
+            { key: "invoices", label: "Invoices", icon: FileCheck, count: invoicesTotal },
+            { key: "advances", label: "Advances", icon: ArrowDownLeft, count: advancesTotal },
+            { key: "payments", label: "Payments", icon: CreditCard, count: paymentsTotal },
+            { key: "credit-notes", label: "Credit Notes", icon: FileMinus, count: creditNotesTotal },
+            { key: "returns", label: "Returns", icon: Undo2, count: challanReturnsTotal },
+          ] as { key: SalesTab; label: string; icon: React.ComponentType<{className?: string}>; count: number }[]).map(({ key, label, icon: Icon, count }) => (
+            <button
+              key={key}
+              onClick={() => handleTabChange(key)}
+              className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                activeTab === key
+                  ? "border-primary text-primary"
+                  : "border-transparent text-text-muted hover:text-ink"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+              <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ml-0.5 ${
+                activeTab === key ? "bg-primary/10 text-primary" : "bg-page-bg text-text-muted"
+              }`}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Filter Controls Bar */}
@@ -1010,9 +861,9 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
       {/* Main Content Area */}
       <div className="rounded-md border border-border bg-surface shadow-elevation-1 overflow-hidden">
         {loading ? (
-          <div className="p-16 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 mx-auto text-primary animate-spin" />
-            <p className="text-body text-text-muted">Loading live records from PostgreSQL...</p>
+          <div className="p-16 text-center space-y-2">
+            <RefreshCw className="w-6 h-6 mx-auto text-primary animate-spin" />
+            <p className="text-[13px] text-text-muted">Loading...</p>
           </div>
         ) : (
           <>
@@ -1020,21 +871,23 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
             {activeTab === "quotations" && (
               <>
                 {quotations.length === 0 ? (
-                  <div className="p-16 text-center space-y-3">
-                    <FileText className="w-12 h-12 mx-auto text-text-muted/40" />
-                    <h3 className="text-h3 font-bold text-ink">No Quotations Found</h3>
-                    <p className="text-body text-text-muted max-w-md mx-auto">
+                  <div className="p-12 text-center space-y-3">
+                    <FileText className="w-10 h-10 mx-auto text-text-muted/30" />
+                    <h3 className="text-[15px] font-semibold text-ink">No quotations found</h3>
+                    <p className="text-[13px] text-text-muted">
                       {search || branchFilter || statusFilter !== "ALL"
-                        ? "No quotations match the active search filters. Try adjusting your query."
-                        : "No commercial quotations recorded yet in the database. Create the first quotation to start the sales lifecycle."}
+                        ? "No results match your filters."
+                        : "No quotations yet. Create the first one to begin the sales workflow."}
                     </p>
-                    <button
-                      onClick={() => setCreateQuoteModalOpen(true)}
-                      className="px-4 py-2 mt-2 rounded-sm bg-primary text-white text-body font-medium hover:bg-primary-hover shadow-sm inline-flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>New Quotation</span>
-                    </button>
+                    {!(search || branchFilter || statusFilter !== "ALL") && (
+                      <button
+                        onClick={() => setCreateQuoteModalOpen(true)}
+                        className="px-4 py-2 mt-1 rounded-sm bg-primary text-white text-[13px] font-medium hover:bg-primary-hover inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        New Quotation
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -2017,13 +1870,17 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ selectedBranchId, init
                                   </div>
                                 </td>
                                 <td className="py-3 px-4 text-right">
-                                  <p className="font-mono font-bold text-emerald-600">
-                                    ৳{sr.refundAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                                  <p className="font-mono font-bold text-ink">
+                                    ৳{sr.totalAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
                                   </p>
-                                  {sr.creditToWallet && (
+                                  {sr.refundAmount > 0 ? (
                                     <span className="text-[10px] font-medium text-emerald-600 flex items-center justify-end gap-1 mt-0.5">
                                       <Wallet className="w-3 h-3" />
-                                      <span>Wallet Credited</span>
+                                      <span>Wallet: ৳{sr.refundAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-medium text-amber-600 flex items-center justify-end gap-1 mt-0.5">
+                                      <span>Due Adjusted</span>
                                     </span>
                                   )}
                                 </td>

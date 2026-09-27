@@ -292,24 +292,24 @@ export const MasterDataWorkspace: React.FC = () => {
   ] as const;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-h1 text-ink font-bold tracking-tight">Master Data Settings</h1>
-          <p className="text-body text-text-muted mt-1">
-            Core configuration for categories, brands, units, warehouses, departments, and tax rates.
+          <h1 className="text-h1 text-ink font-bold tracking-tight">Configuration</h1>
+          <p className="text-[13px] text-text-muted mt-0.5">
+            Categories, brands, units, warehouses, departments, and tax rates.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            title="Refresh database records"
-            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50 shadow-elevation-1"
+            title="Refresh"
+            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-primary" : ""}`} />
           </button>
@@ -337,16 +337,16 @@ export const MasterDataWorkspace: React.FC = () => {
               }
               setAddModalOpen(true);
             }}
-            className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+            className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add {tabs.find((t) => t.id === activeTab)?.label.slice(0, -1) || "Item"}</span>
+            <Plus className="w-3.5 h-3.5" />
+            Add {tabs.find((t) => t.id === activeTab)?.label.split(" ")[0] || "Item"}
           </button>
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-border overflow-x-auto pb-px">
+      {/* Tabs */}
+      <div className="flex items-center gap-0 border-b border-border overflow-x-auto bg-surface px-3 rounded-t-sm">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -354,17 +354,17 @@ export const MasterDataWorkspace: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id as MasterDataTab)}
-              className={`flex items-center gap-2 px-4 py-3 text-body font-medium transition-all border-b-2 whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium transition-colors border-b-2 whitespace-nowrap ${
                 isActive
-                  ? "border-primary text-primary bg-primary-tint/30"
-                  : "border-transparent text-text-muted hover:text-ink hover:border-border"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-text-muted hover:text-ink"
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
               <span
-                className={`text-[11px] px-2 py-0.2 rounded-full font-mono ${
-                  isActive ? "bg-primary text-white" : "bg-page-bg text-text-muted border border-border"
+                className={`text-[11px] px-1.5 py-0.5 rounded font-medium ml-0.5 ${
+                  isActive ? "bg-primary/10 text-primary" : "bg-page-bg text-text-muted"
                 }`}
               >
                 {tab.count}
@@ -410,9 +410,9 @@ export const MasterDataWorkspace: React.FC = () => {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-text-muted">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-primary mb-2" />
-                    <p className="text-body font-medium">Loading {activeTab} from PostgreSQL...</p>
+                  <td colSpan={6} className="py-10 text-center text-text-muted">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto text-primary mb-2" />
+                    <p className="text-[13px]">Loading...</p>
                   </td>
                 </tr>
               ) : (

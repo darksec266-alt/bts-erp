@@ -264,30 +264,25 @@ export const ServiceModule: React.FC<ServiceModuleProps> = ({ selectedBranchId }
   }, [assignments, search, assignmentStatusFilter]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fadeIn font-sans">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Top Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-sm bg-primary-tint text-primary">
-              <Wrench className="w-5 h-5" />
-            </span>
-            <h1 className="text-h1 text-ink font-bold tracking-tight">Field Service & Tickets</h1>
-          </div>
-          <p className="text-body text-text-muted mt-1">
-            Dispatch technicians, track serialized warranty claims, monitor live GPS visits, and inspect job costing P&L.
+          <h1 className="text-h1 text-ink font-bold tracking-tight">Field Service</h1>
+          <p className="text-[13px] text-text-muted mt-0.5">
+            Tickets, technician dispatch, warranty tracking, and job P&L.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => fetchData(true)}
             disabled={refreshing}
-            className="p-2 rounded-sm border border-border bg-surface text-ink hover:bg-page-bg transition-colors disabled:opacity-50"
-            title="Refresh Service Data"
+            className="p-2 rounded-sm border border-border bg-surface text-text-muted hover:bg-page-bg transition-colors disabled:opacity-50"
+            title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-primary" : ""}`} />
           </button>
@@ -295,10 +290,10 @@ export const ServiceModule: React.FC<ServiceModuleProps> = ({ selectedBranchId }
           <button
             type="button"
             onClick={() => setIsTicketModalOpen(true)}
-            className="px-4 py-2 text-body font-semibold rounded-sm bg-primary text-white hover:bg-primary-hover transition-colors flex items-center gap-2 shadow-sm"
+            className="px-3.5 py-2 text-[13px] font-semibold rounded-sm bg-primary text-white hover:bg-primary-hover transition-colors flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Ticket</span>
+            <Plus className="w-3.5 h-3.5" />
+            New Ticket
           </button>
 
           <button
@@ -307,10 +302,10 @@ export const ServiceModule: React.FC<ServiceModuleProps> = ({ selectedBranchId }
               setAssignmentPreselectTicketId(undefined);
               setIsAssignmentModalOpen(true);
             }}
-            className="px-4 py-2 text-body font-semibold rounded-sm border border-primary text-primary bg-primary-tint/20 hover:bg-primary-tint/40 transition-colors flex items-center gap-2"
+            className="px-3.5 py-2 text-[13px] font-semibold rounded-sm border border-primary text-primary bg-primary-tint/20 hover:bg-primary-tint/40 transition-colors flex items-center gap-1.5"
           >
-            <Calendar className="w-4 h-4" />
-            <span>Dispatch Assignment</span>
+            <Calendar className="w-3.5 h-3.5" />
+            Dispatch
           </button>
         </div>
       </div>
@@ -363,15 +358,15 @@ export const ServiceModule: React.FC<ServiceModuleProps> = ({ selectedBranchId }
         </div>
       </div>
 
-      {/* Primary Tab Navigation */}
-      <div className="border-b border-border flex items-center gap-6 overflow-x-auto">
+      {/* Tab Navigation */}
+      <div className="border-b border-border flex items-center gap-1 overflow-x-auto bg-surface px-3 rounded-t-sm">
         {[
-          { id: "tickets", label: "Service Tickets", count: tickets.length, icon: Wrench },
-          { id: "assignments", label: "Assignments & Dispatch", count: assignments.length, icon: Calendar },
-          { id: "custody", label: "Product Custody", count: custodyItems.length, icon: PackageCheck },
-          { id: "visits", label: "GPS Visit Logs", count: locationLogs.length, icon: MapPin },
-          { id: "finances", label: "Advances & Conveyance", count: advances.length + conveyanceBills.length, icon: DollarSign },
-          { id: "warranties", label: "Warranties & Claims", count: warranties.length, icon: ShieldCheck },
+          { id: "tickets", label: "Tickets", count: tickets.length, icon: Wrench },
+          { id: "assignments", label: "Assignments", count: assignments.length, icon: Calendar },
+          { id: "custody", label: "Custody", count: custodyItems.length, icon: PackageCheck },
+          { id: "visits", label: "Site Visits", count: locationLogs.length, icon: MapPin },
+          { id: "finances", label: "Finances", count: advances.length + conveyanceBills.length, icon: DollarSign },
+          { id: "warranties", label: "Warranties", count: warranties.length, icon: ShieldCheck },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -390,13 +385,13 @@ export const ServiceModule: React.FC<ServiceModuleProps> = ({ selectedBranchId }
                     | "warranties"
                 )
               }
-              className={`pb-3 pt-2 text-body font-semibold flex items-center gap-2 transition-colors border-b-2 relative whitespace-nowrap ${
+              className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 transition-colors border-b-2 relative whitespace-nowrap ${
                 isActive
                   ? "border-primary text-primary"
                   : "border-transparent text-text-muted hover:text-ink"
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
               <span
                 className={`text-[11px] px-1.5 py-0.2 rounded-full font-mono ${

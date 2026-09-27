@@ -478,6 +478,59 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
     );
 
     const runner = async (tx: AnyPrisma) => {
+      // 0. PRE-FLIGHT: Validate stock availability BEFORE creating the challan
+      const challanWarehouse =
+        (await tx.warehouse?.findFirst({
+          where: salesOrderId
+            ? { branchId: (await tx.salesOrder?.findUnique({ where: { id: salesOrderId } }))?.branchId || undefined, isActive: true }
+            : { isActive: true },
+        })) || (await tx.warehouse?.findFirst({ where: { isActive: true } }));
+
+      if (challanWarehouse && tx.stockLedger) {
+        for (const line of linesToCreate) {
+          if (!line.productId) continue;
+          const qtyRequested = Number(line.quantity) || 0;
+          if (qtyRequested <= 0) continue;
+
+          const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
+          const productName = prod?.name || line.productId;
+          const productSku = prod?.sku || "";
+          const isSerialized = prod?.trackingType === "SERIALIZED";
+
+          if (isSerialized && tx.serialNumber) {
+            const availableCount = await tx.serialNumber.count({
+              where: {
+                productId: line.productId,
+                warehouseId: challanWarehouse.id,
+                currentStage: "IN_STOCK",
+              },
+            });
+            if (availableCount < qtyRequested) {
+              throw new Error(
+                `Insufficient serialized stock for '${productName}'${productSku ? ` (SKU: ${productSku})` : ""}. ` +
+                `Available in stock: ${availableCount}, requested: ${qtyRequested}.`
+              );
+            }
+          } else {
+            const stockRow = await tx.stockLedger.findUnique({
+              where: {
+                productId_warehouseId: {
+                  productId: line.productId,
+                  warehouseId: challanWarehouse.id,
+                },
+              },
+            });
+            const availableQty = stockRow ? Number(stockRow.quantityOnHand) : 0;
+            if (availableQty < qtyRequested) {
+              throw new Error(
+                `Insufficient stock for '${productName}'${productSku ? ` (SKU: ${productSku})` : ""}. ` +
+                `Available in stock: ${availableQty}, requested: ${qtyRequested}.`
+              );
+            }
+          }
+        }
+      }
+
       const row = await tx.deliveryChallan.create({
         data: {
           challanNumber,
@@ -504,119 +557,100 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       });
 
       // Deduct dispatched quantities from StockLedger for the operating warehouse
-      try {
-        const salesOrder = await tx.salesOrder.findUnique({
-          where: { id: salesOrderId },
-        });
-        const warehouse =
-          (await tx.warehouse?.findFirst({
-            where: salesOrder?.branchId ? { branchId: salesOrder.branchId, isActive: true } : { isActive: true },
-          })) || (await tx.warehouse?.findFirst({ where: { isActive: true } }));
+      // NOTE: Stock availability was pre-validated above (step 0), safe to deduct now.
+      if (challanWarehouse && tx.stockLedger) {
+        for (const line of linesToCreate) {
+          if (line.productId) {
+            const qtyToDeduct = Number(line.quantity) || 0;
+            const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
+            const isSerialized = prod?.trackingType === "SERIALIZED";
 
-        if (warehouse && tx.stockLedger) {
-          for (const line of linesToCreate) {
-            if (line.productId) {
-              const qtyToDeduct = Number(line.quantity) || 0;
-              const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
-              const isSerialized = prod?.trackingType === "SERIALIZED";
-
-              if (isSerialized && tx.serialNumber) {
-                const lineSerials = (line as any).serialNumberIds || (line as any).serials || [];
-                if (lineSerials.length > 0) {
-                  const units = await tx.serialNumber.findMany({
-                    where: {
-                      OR: [
-                        { id: { in: lineSerials } },
-                        { serial: { in: lineSerials } },
-                        { barcode: { in: lineSerials } },
-                      ],
-                      productId: line.productId,
-                    },
+            if (isSerialized && tx.serialNumber) {
+              const lineSerials = (line as AnyPrisma).serialNumberIds || (line as AnyPrisma).serials || [];
+              if (lineSerials.length > 0) {
+                const units = await tx.serialNumber.findMany({
+                  where: {
+                    OR: [
+                      { id: { in: lineSerials } },
+                      { serial: { in: lineSerials } },
+                      { barcode: { in: lineSerials } },
+                    ],
+                    productId: line.productId,
+                  },
+                });
+                for (const unit of units) {
+                  await tx.serialNumber.update({
+                    where: { id: unit.id },
+                    data: { currentStage: "SOLD", warehouseId: null },
                   });
-                  for (const unit of units) {
-                    await tx.serialNumber.update({
-                      where: { id: unit.id },
-                      data: { currentStage: "SOLD", warehouseId: null },
-                    });
-                    if (tx.sKULifecycleEvent) {
-                      await tx.sKULifecycleEvent.create({
-                        data: {
-                          serialNumberId: unit.id,
-                          eventType: "SOLD",
-                          sourceModule: "DELIVERY_CHALLAN",
-                          sourceId: row.id,
-                          fromWarehouseId: warehouse.id,
-                          fromStage: "IN_STOCK",
-                          toStage: "SOLD",
-                          notes: `Dispatched via delivery challan ${row.challanNumber}`,
-                        },
-                      }).catch(() => {});
-                    }
+                  if (tx.sKULifecycleEvent) {
+                    await tx.sKULifecycleEvent.create({
+                      data: {
+                        serialNumberId: unit.id,
+                        eventType: "SOLD",
+                        sourceModule: "DELIVERY_CHALLAN",
+                        sourceId: row.id,
+                        fromWarehouseId: challanWarehouse.id,
+                        fromStage: "IN_STOCK",
+                        toStage: "SOLD",
+                        notes: `Dispatched via delivery challan ${row.challanNumber}`,
+                      },
+                    }).catch(() => {});
                   }
-                } else if (qtyToDeduct > 0) {
-                  const availableUnits = await tx.serialNumber.findMany({
-                    where: {
-                      productId: line.productId,
-                      warehouseId: warehouse.id,
-                      currentStage: "IN_STOCK",
-                    },
-                    take: qtyToDeduct,
+                }
+              } else if (qtyToDeduct > 0) {
+                const availableUnits = await tx.serialNumber.findMany({
+                  where: {
+                    productId: line.productId,
+                    warehouseId: challanWarehouse.id,
+                    currentStage: "IN_STOCK",
+                  },
+                  take: qtyToDeduct,
+                });
+                for (const unit of availableUnits) {
+                  await tx.serialNumber.update({
+                    where: { id: unit.id },
+                    data: { currentStage: "SOLD", warehouseId: null },
                   });
-                  for (const unit of availableUnits) {
-                    await tx.serialNumber.update({
-                      where: { id: unit.id },
-                      data: { currentStage: "SOLD", warehouseId: null },
-                    });
-                    if (tx.sKULifecycleEvent) {
-                      await tx.sKULifecycleEvent.create({
-                        data: {
-                          serialNumberId: unit.id,
-                          eventType: "SOLD",
-                          sourceModule: "DELIVERY_CHALLAN",
-                          sourceId: row.id,
-                          fromWarehouseId: warehouse.id,
-                          fromStage: "IN_STOCK",
-                          toStage: "SOLD",
-                          notes: `Dispatched via delivery challan ${row.challanNumber}`,
-                        },
-                      }).catch(() => {});
-                    }
+                  if (tx.sKULifecycleEvent) {
+                    await tx.sKULifecycleEvent.create({
+                      data: {
+                        serialNumberId: unit.id,
+                        eventType: "SOLD",
+                        sourceModule: "DELIVERY_CHALLAN",
+                        sourceId: row.id,
+                        fromWarehouseId: challanWarehouse.id,
+                        fromStage: "IN_STOCK",
+                        toStage: "SOLD",
+                        notes: `Dispatched via delivery challan ${row.challanNumber}`,
+                      },
+                    }).catch(() => {});
                   }
                 }
               }
+            }
 
-              const stockRow = await tx.stockLedger.findUnique({
-                where: {
-                  productId_warehouseId: {
-                    productId: line.productId,
-                    warehouseId: warehouse.id,
-                  },
+            const stockRow = await tx.stockLedger.findUnique({
+              where: {
+                productId_warehouseId: {
+                  productId: line.productId,
+                  warehouseId: challanWarehouse.id,
                 },
+              },
+            });
+            if (stockRow) {
+              // Safe decrement — pre-validated, currentStock >= qtyToDeduct
+              await tx.stockLedger.update({
+                where: { id: stockRow.id },
+                data: { quantityOnHand: { decrement: qtyToDeduct } },
               });
-              if (stockRow) {
-                const currentStock = Number(stockRow.quantityOnHand) || 0;
-                const newStock = Math.max(0, currentStock - qtyToDeduct);
-                await tx.stockLedger.update({
-                  where: { id: stockRow.id },
-                  data: { quantityOnHand: newStock },
-                });
-              } else {
-                await tx.stockLedger.create({
-                  data: {
-                    productId: line.productId,
-                    warehouseId: warehouse.id,
-                    quantityOnHand: 0,
-                  },
-                });
-              }
             }
           }
         }
-      } catch (stockErr) {
-        console.error("[Sales] Stock deduction notice:", stockErr);
       }
 
       return row;
+
     };
 
     const row = this.prisma.$transaction
@@ -1374,6 +1408,86 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
     grandTotal = Number(grandTotal.toFixed(2));
 
     const runner = async (tx: AnyPrisma) => {
+      // 0. PRE-FLIGHT: Validate stock availability BEFORE creating any records
+      const stockWarehouse =
+        (data.warehouseId ? await tx.warehouse?.findUnique({ where: { id: data.warehouseId } }) : null) ||
+        (await tx.warehouse?.findFirst({
+          where: { branchId: data.branchId, isActive: true },
+        })) ||
+        (await tx.warehouse?.findFirst({ where: { isActive: true } }));
+
+      if (stockWarehouse && tx.stockLedger) {
+        for (const line of data.lines) {
+          if (!line.productId) continue;
+          const qtyRequested = Number(line.quantity) || 0;
+          if (qtyRequested <= 0) continue;
+
+          const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
+          const productName = prod?.name || line.productId;
+          const productSku = prod?.sku || "";
+          const isSerialized = prod?.trackingType === "SERIALIZED";
+
+          if (isSerialized && tx.serialNumber) {
+            // For serialized items: count available IN_STOCK units in warehouse
+            const lineSerials = (line as AnyPrisma).serialNumberIds || (line as AnyPrisma).serials || [];
+            if (lineSerials.length > 0) {
+              // Specific serials provided — verify each is IN_STOCK in this warehouse
+              const availableUnits = await tx.serialNumber.findMany({
+                where: {
+                  OR: [
+                    { id: { in: lineSerials } },
+                    { serial: { in: lineSerials } },
+                    { barcode: { in: lineSerials } },
+                  ],
+                  productId: line.productId,
+                  currentStage: "IN_STOCK",
+                  warehouseId: stockWarehouse.id,
+                },
+              });
+              if (availableUnits.length < lineSerials.length) {
+                const missing = lineSerials.length - availableUnits.length;
+                throw new Error(
+                  `Insufficient serialized stock for '${productName}'${productSku ? ` (SKU: ${productSku})` : ""}. ` +
+                  `${missing} of the requested serial unit(s) are not available in stock.`
+                );
+              }
+            } else {
+              // No specific serials — check by count
+              const availableCount = await tx.serialNumber.count({
+                where: {
+                  productId: line.productId,
+                  warehouseId: stockWarehouse.id,
+                  currentStage: "IN_STOCK",
+                },
+              });
+              if (availableCount < qtyRequested) {
+                throw new Error(
+                  `Insufficient serialized stock for '${productName}'${productSku ? ` (SKU: ${productSku})` : ""}. ` +
+                  `Available in stock: ${availableCount}, requested: ${qtyRequested}.`
+                );
+              }
+            }
+          } else {
+            // Non-serialized: check StockLedger quantityOnHand
+            const stockRow = await tx.stockLedger.findUnique({
+              where: {
+                productId_warehouseId: {
+                  productId: line.productId,
+                  warehouseId: stockWarehouse.id,
+                },
+              },
+            });
+            const availableQty = stockRow ? Number(stockRow.quantityOnHand) : 0;
+            if (availableQty < qtyRequested) {
+              throw new Error(
+                `Insufficient stock for '${productName}'${productSku ? ` (SKU: ${productSku})` : ""}. ` +
+                `Available in stock: ${availableQty}, requested: ${qtyRequested}.`
+              );
+            }
+          }
+        }
+      }
+
       // 2. Create SalesOrder (orderType: "DIRECT_SALE")
       const order = await tx.salesOrder.create({
         data: {
@@ -1437,116 +1551,98 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       }
 
       // 5. Deduct inventory from StockLedger for warehouse
-      try {
-        const warehouse =
-          (data.warehouseId ? await tx.warehouse?.findUnique({ where: { id: data.warehouseId } }) : null) ||
-          (await tx.warehouse?.findFirst({
-            where: { branchId: data.branchId, isActive: true },
-          })) ||
-          (await tx.warehouse?.findFirst({ where: { isActive: true } }));
+      // NOTE: Stock availability was already validated above (step 0), so we can safely deduct here.
+      if (stockWarehouse && tx.stockLedger) {
+        for (const line of data.lines) {
+          if (!line.productId) continue;
+          const qtyToDeduct = Number(line.quantity) || 0;
+          const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
+          const isSerialized = prod?.trackingType === "SERIALIZED";
 
-        if (warehouse && tx.stockLedger) {
-          for (const line of data.lines) {
-            if (!line.productId) continue;
-            const qtyToDeduct = Number(line.quantity) || 0;
-            const prod = tx.product ? await tx.product.findUnique({ where: { id: line.productId } }) : null;
-            const isSerialized = prod?.trackingType === "SERIALIZED";
-
-            if (isSerialized && tx.serialNumber) {
-              const lineSerials = (line as any).serialNumberIds || (line as any).serials || [];
-              if (lineSerials.length > 0) {
-                const units = await tx.serialNumber.findMany({
-                  where: {
-                    OR: [
-                      { id: { in: lineSerials } },
-                      { serial: { in: lineSerials } },
-                      { barcode: { in: lineSerials } },
-                    ],
-                    productId: line.productId,
-                  },
+          if (isSerialized && tx.serialNumber) {
+            const lineSerials = (line as AnyPrisma).serialNumberIds || (line as AnyPrisma).serials || [];
+            if (lineSerials.length > 0) {
+              const units = await tx.serialNumber.findMany({
+                where: {
+                  OR: [
+                    { id: { in: lineSerials } },
+                    { serial: { in: lineSerials } },
+                    { barcode: { in: lineSerials } },
+                  ],
+                  productId: line.productId,
+                },
+              });
+              for (const unit of units) {
+                await tx.serialNumber.update({
+                  where: { id: unit.id },
+                  data: { currentStage: "SOLD", warehouseId: null },
                 });
-                for (const unit of units) {
-                  await tx.serialNumber.update({
-                    where: { id: unit.id },
-                    data: { currentStage: "SOLD", warehouseId: null },
-                  });
-                  if (tx.sKULifecycleEvent) {
-                    await tx.sKULifecycleEvent.create({
-                      data: {
-                        serialNumberId: unit.id,
-                        eventType: "SOLD",
-                        sourceModule: "DIRECT_SALE",
-                        sourceId: invoice.id,
-                        fromWarehouseId: warehouse.id,
-                        fromStage: "IN_STOCK",
-                        toStage: "SOLD",
-                        notes: `Sold via direct sale ${invoiceNumber} / ${orderNumber}`,
-                        performedById: (data as AnyPrisma).salesExecutiveId || null,
-                      },
-                    }).catch(() => {});
-                  }
+                if (tx.sKULifecycleEvent) {
+                  await tx.sKULifecycleEvent.create({
+                    data: {
+                      serialNumberId: unit.id,
+                      eventType: "SOLD",
+                      sourceModule: "DIRECT_SALE",
+                      sourceId: invoice.id,
+                      fromWarehouseId: stockWarehouse.id,
+                      fromStage: "IN_STOCK",
+                      toStage: "SOLD",
+                      notes: `Sold via direct sale ${invoiceNumber} / ${orderNumber}`,
+                      performedById: (data as AnyPrisma).salesExecutiveId || null,
+                    },
+                  }).catch(() => {});
                 }
-              } else if (qtyToDeduct > 0) {
-                const availableUnits = await tx.serialNumber.findMany({
-                  where: {
-                    productId: line.productId,
-                    warehouseId: warehouse.id,
-                    currentStage: "IN_STOCK",
-                  },
-                  take: qtyToDeduct,
+              }
+            } else if (qtyToDeduct > 0) {
+              const availableUnits = await tx.serialNumber.findMany({
+                where: {
+                  productId: line.productId,
+                  warehouseId: stockWarehouse.id,
+                  currentStage: "IN_STOCK",
+                },
+                take: qtyToDeduct,
+              });
+              for (const unit of availableUnits) {
+                await tx.serialNumber.update({
+                  where: { id: unit.id },
+                  data: { currentStage: "SOLD", warehouseId: null },
                 });
-                for (const unit of availableUnits) {
-                  await tx.serialNumber.update({
-                    where: { id: unit.id },
-                    data: { currentStage: "SOLD", warehouseId: null },
-                  });
-                  if (tx.sKULifecycleEvent) {
-                    await tx.sKULifecycleEvent.create({
-                      data: {
-                        serialNumberId: unit.id,
-                        eventType: "SOLD",
-                        sourceModule: "DIRECT_SALE",
-                        sourceId: invoice.id,
-                        fromWarehouseId: warehouse.id,
-                        fromStage: "IN_STOCK",
-                        toStage: "SOLD",
-                        notes: `Sold via direct sale ${invoiceNumber} / ${orderNumber}`,
-                        performedById: (data as AnyPrisma).salesExecutiveId || null,
-                      },
-                    }).catch(() => {});
-                  }
+                if (tx.sKULifecycleEvent) {
+                  await tx.sKULifecycleEvent.create({
+                    data: {
+                      serialNumberId: unit.id,
+                      eventType: "SOLD",
+                      sourceModule: "DIRECT_SALE",
+                      sourceId: invoice.id,
+                      fromWarehouseId: stockWarehouse.id,
+                      fromStage: "IN_STOCK",
+                      toStage: "SOLD",
+                      notes: `Sold via direct sale ${invoiceNumber} / ${orderNumber}`,
+                      performedById: (data as AnyPrisma).salesExecutiveId || null,
+                    },
+                  }).catch(() => {});
                 }
               }
             }
-
-            const stockRow = await tx.stockLedger.findUnique({
-              where: {
-                productId_warehouseId: {
-                  productId: line.productId,
-                  warehouseId: warehouse.id,
-                },
-              },
-            });
-            if (stockRow) {
-              const currentStock = Number(stockRow.quantityOnHand) || 0;
-              const newStock = Math.max(0, currentStock - qtyToDeduct);
-              await tx.stockLedger.update({
-                where: { id: stockRow.id },
-                data: { quantityOnHand: newStock },
-              });
-            } else {
-              await tx.stockLedger.create({
-                data: {
-                  productId: line.productId,
-                  warehouseId: warehouse.id,
-                  quantityOnHand: 0,
-                },
-              });
-            }
           }
+
+          const stockRow = await tx.stockLedger.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: line.productId,
+                warehouseId: stockWarehouse.id,
+              },
+            },
+          });
+          if (stockRow) {
+            // Safe decrement — stock was pre-validated, so currentStock >= qtyToDeduct
+            await tx.stockLedger.update({
+              where: { id: stockRow.id },
+              data: { quantityOnHand: { decrement: qtyToDeduct } },
+            });
+          }
+          // If no stock row exists and we reach here, pre-validation already allowed it (0 stock, 0 requested)
         }
-      } catch (stockErr) {
-        console.error("[DirectSale] Stock deduction note:", stockErr);
       }
 
       return { order, invoice, createdPayment };
@@ -3016,7 +3112,34 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       }
     }
 
-    return { invoice, items };
+    // Load financial details for the invoice
+    const invRow = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        payments: true,
+        advanceAdjustments: true,
+      },
+    });
+
+    const grandTotal = Number(invoice.grandTotal);
+    const paidFromPayments = (invRow?.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
+    const paidFromAdvances = ((invRow as any)?.advanceAdjustments || []).reduce((s: number, a: any) => s + Number(a.amountAdjusted), 0);
+    const totalPaid = Number((paidFromPayments + paidFromAdvances).toFixed(2));
+    const alreadyReturnedAmount = Number(
+      existingReturns.reduce((s: number, r: any) => s + Number(r.totalAmount || r.refundAmount || 0), 0).toFixed(2)
+    );
+    const currentDue = Math.max(0, Number((grandTotal - totalPaid - alreadyReturnedAmount).toFixed(2)));
+
+    return {
+      invoice,
+      items,
+      financials: {
+        grandTotal,
+        totalPaid,
+        alreadyReturnedAmount,
+        currentDue,
+      },
+    };
   }
 
   async createSalesReturn(
@@ -3028,6 +3151,9 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
       include: {
         customer: true,
         branch: true,
+        payments: true,
+        advanceAdjustments: true,
+        salesReturns: true,
       },
     });
 
@@ -3096,7 +3222,35 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
     }
 
     totalAmount = Number(totalAmount.toFixed(2));
+
+    // Calculate invoice financials before return
+    const grandTotal = Number(invoice.grandTotal);
+    const paidFromPayments = (invoice.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
+    const paidFromAdvances = ((invoice as any).advanceAdjustments || []).reduce((s: number, a: any) => s + Number(a.amountAdjusted), 0);
+    const totalPaid = Number((paidFromPayments + paidFromAdvances).toFixed(2));
+
+    const priorReturns = invoice.salesReturns || [];
+    const alreadyReturnedAmount = Number(
+      priorReturns.reduce((s: number, r: any) => s + Number(r.totalAmount || r.refundAmount || 0), 0).toFixed(2)
+    );
+    const currentDueBeforeReturn = Math.max(0, Number((grandTotal - totalPaid - alreadyReturnedAmount).toFixed(2)));
+
+    // User requirement: "JODI KONO CUSTOMER DUE BILL KORE TAHOLE TA RETURN KORLE KOKKHONOI WALLET A ADD HOBE NA. TA CURRENT DUE THEKE BAD JABE."
+    // 1. Amount to deduct from current due (due adjustment)
+    const dueDeduction = Number(Math.min(totalAmount, currentDueBeforeReturn).toFixed(2));
+    // 2. Excess refund (only if customer actually paid more cash than the remaining bill after return)
+    const excessPaidRefund = Number(Math.max(0, totalAmount - dueDeduction).toFixed(2));
+    // 3. Wallet credit amount (only excess paid portion can go to wallet if creditToWallet is requested)
+    const walletCreditAmount = (data.creditToWallet ?? true) ? excessPaidRefund : 0;
+
     const returnNumber = `RET-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const returnReason = [
+      data.reason?.trim(),
+      dueDeduction > 0 ? `Due Adjusted: ৳${dueDeduction.toFixed(2)}` : null,
+      walletCreditAmount > 0 ? `Wallet Refund: ৳${walletCreditAmount.toFixed(2)}` : null,
+      dueDeduction > 0 && walletCreditAmount === 0 ? `Due bill return - No wallet credit` : null,
+    ].filter(Boolean).join(" | ");
 
     const row = await (this.prisma as any).$transaction(async (tx: any) => {
       // 1. Create SalesReturn record
@@ -3109,8 +3263,8 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
           warehouseId: data.warehouseId,
           totalAmount,
           creditToWallet: data.creditToWallet ?? true,
-          refundAmount: totalAmount,
-          reason: data.reason || "Customer Return",
+          refundAmount: walletCreditAmount,
+          reason: returnReason || "Customer Return",
           status: "COMPLETED",
           createdById: userId || null,
           lines: {
@@ -3139,28 +3293,29 @@ export class PrismaSalesRepository implements SalesRepositoryPort {
           creditNoteNumber: `CN-${returnNumber}`,
           invoiceId: invoice.id,
           amount: totalAmount,
-          reason: `Sales Return #${returnNumber}${data.reason ? ": " + data.reason : ""}`,
+          reason: `Sales Return #${returnNumber}${dueDeduction > 0 ? ` (Due Adjusted: ৳${dueDeduction.toFixed(2)})` : ""}${walletCreditAmount > 0 ? ` (Wallet Refund: ৳${walletCreditAmount.toFixed(2)})` : ""}`,
         },
       });
 
-      // 3. Credit to Customer Wallet if requested (User requirement: "Tk customer er wallet a add hobe")
-      if (data.creditToWallet ?? true) {
+      // 3. Credit to Customer Wallet ONLY IF walletCreditAmount > 0
+      // If invoice was a due bill, dueDeduction absorbs the return, so walletCreditAmount === 0 (wallet is untouched!)
+      if (walletCreditAmount > 0) {
         const updatedCustomer = await tx.customer.update({
           where: { id: invoice.customerId },
           data: {
-            walletBalance: { increment: totalAmount },
+            walletBalance: { increment: walletCreditAmount },
           },
         });
 
         await tx.customerWalletTransaction.create({
           data: {
             customerId: invoice.customerId,
-            amount: totalAmount,
+            amount: walletCreditAmount,
             type: "SALES_RETURN_REFUND",
             referenceType: "SALES_RETURN",
             referenceId: createdReturn.id,
             balanceAfter: updatedCustomer.walletBalance,
-            notes: `Refund from Sales Return #${returnNumber} for Invoice #${invoice.invoiceNumber}`,
+            notes: `Refund from Sales Return #${returnNumber} for Invoice #${invoice.invoiceNumber}${dueDeduction > 0 ? ` (৳${dueDeduction.toFixed(2)} deducted from due bill, ৳${walletCreditAmount.toFixed(2)} credited to wallet)` : ""}`,
             createdById: userId || null,
           },
         });

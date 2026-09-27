@@ -174,112 +174,72 @@ export const ProductList: React.FC = () => {
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Header & Primary Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-h1 text-ink font-bold tracking-tight">Products & SKUs</h1>
-          <p className="text-body text-text-muted mt-1">
-            Centralized product catalog, pricing specifications, and inventory unit masters.
+          <h1 className="text-h1 text-ink font-bold tracking-tight">Products</h1>
+          <p className="text-[13px] text-text-muted mt-0.5">
+            Product catalog, pricing, and unit masters.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            title="Refresh database records"
-            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50 shadow-elevation-1"
+            title="Refresh"
+            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-primary" : ""}`} />
           </button>
 
           <button
             onClick={handleExportCsv}
-            className="px-3.5 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-body font-medium text-ink flex items-center gap-2 transition-colors shadow-elevation-1"
+            className="px-3 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-[13px] font-medium text-ink flex items-center gap-1.5 transition-colors"
           >
-            <Download className="w-4 h-4 text-text-muted" />
-            <span>Export CSV</span>
+            <Download className="w-3.5 h-3.5 text-text-muted" />
+            Export
           </button>
 
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+            className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Product</span>
+            <Plus className="w-3.5 h-3.5" />
+            New Product
           </button>
         </div>
       </div>
 
-      {/* KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Catalog Products */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Total SKUs
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {totalCount}
-            </div>
-            <span className="text-[12px] text-text-muted mt-0.5 block">Catalog Items</span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-primary-tint flex items-center justify-center text-primary">
-            <Package className="w-6 h-6" />
-          </div>
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total SKUs</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{totalCount}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Catalog items</p>
         </div>
 
-        {/* Active SKUs */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Active Items
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums text-success">
-              {activeCount}
-            </div>
-            <span className="text-[12px] text-success font-medium mt-0.5 block flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Ready for sale
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-success-tint flex items-center justify-center text-success">
-            <Box className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active</p>
+          <p className="text-h1 font-bold text-success mt-1 tabular-nums">{activeCount}</p>
+          <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Ready for sale
+          </p>
         </div>
 
-        {/* Physical Stock Items */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Physical Goods
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {physicalCount}
-            </div>
-            <span className="text-[12px] text-text-muted mt-0.5 block">Warehouse stocked</span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-purple-tint flex items-center justify-center text-purple">
-            <Layers className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Physical</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{physicalCount}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Stock-tracked</p>
         </div>
 
-        {/* Services & Labour */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Services & Labour
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums text-warning">
-              {serviceCount}
-            </div>
-            <span className="text-[12px] text-warning font-medium mt-0.5 block">Zero stock tracking</span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-warning-tint flex items-center justify-center text-warning">
-            <Wrench className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Services</p>
+          <p className="text-h1 font-bold text-warning mt-1 tabular-nums">{serviceCount}</p>
+          <p className="text-[11px] text-warning font-medium mt-0.5">Non-stocked</p>
         </div>
       </div>
 

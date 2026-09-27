@@ -771,17 +771,30 @@ export const CustomerDetailDrawer: React.FC<CustomerDetailDrawerProps> = ({
                                   ))}
                                 </div>
                               </td>
-                              <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600">
-                                ৳{Number(sr.refundAmount).toLocaleString("en-BD", { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className="py-2.5 px-3 text-center">
-                                {sr.creditToWallet ? (
-                                  <span className="text-[11px] font-semibold text-success px-2 py-0.5 rounded-full bg-success-tint border border-success/20 inline-flex items-center gap-1">
-                                    <Check className="w-3 h-3 stroke-[3]" />
-                                    <span>Yes</span>
+                              <td className="py-2.5 px-3 text-right">
+                                <span className="font-mono font-bold text-ink block">
+                                  ৳{Number(sr.totalAmount || sr.refundAmount).toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                                </span>
+                                {Number(sr.refundAmount) > 0 ? (
+                                  <span className="text-[10px] text-emerald-600 font-medium">
+                                    Wallet: ৳{Number(sr.refundAmount).toLocaleString("en-BD", { minimumFractionDigits: 2 })}
                                   </span>
                                 ) : (
-                                  <span className="text-caption text-text-muted">No</span>
+                                  <span className="text-[10px] text-amber-600 font-medium">
+                                    Due Adjusted
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                {Number(sr.refundAmount) > 0 && sr.creditToWallet ? (
+                                  <span className="text-[11px] font-semibold text-success px-2 py-0.5 rounded-full bg-success-tint border border-success/20 inline-flex items-center gap-1">
+                                    <Check className="w-3 h-3 stroke-[3]" />
+                                    <span>Yes (৳{Number(sr.refundAmount).toFixed(0)})</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-medium text-amber-700 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                                    Due Bill Offset
+                                  </span>
                                 )}
                               </td>
                             </tr>

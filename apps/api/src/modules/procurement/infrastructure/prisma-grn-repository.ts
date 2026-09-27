@@ -338,7 +338,7 @@ export class PrismaGrnRepository implements GrnRepository {
               data: {
                 productId: line.productId,
                 serial: s.serial,
-                barcode: s.barcode || null,
+                barcode: s.barcode || (prod?.sku ? `BC-${prod.sku}-${s.serial}` : null),
                 warehouseId: input.status !== "DRAFT" ? targetWarehouseId : null,
                 purchaseOrderId: input.purchaseOrderId,
                 grnId: row.id,

@@ -193,176 +193,153 @@ export const InventoryModule: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-h1 font-bold text-ink flex items-center gap-2.5">
-            <Warehouse className="w-7 h-7 text-primary" />
-            <span>Inventory & Warehouse Management</span>
-          </h1>
-          <p className="text-body text-text-muted mt-1">
-            Real-time stock ledgers, inter-warehouse movements, batch/serial tracking, and loss adjustments
+          <h1 className="text-h1 font-bold text-ink tracking-tight">Inventory</h1>
+          <p className="text-[13px] text-text-muted mt-0.5">
+            Stock balances, transfers, batch/serial tracking, and loss reports.
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowTransferModal(true)}
-            className="h-10 px-3.5 rounded-sm bg-surface border border-border hover:bg-page-bg text-ink text-body font-medium flex items-center gap-1.5 shadow-elevation-1 transition-colors"
+            className="px-3 py-2 rounded-sm bg-surface border border-border hover:bg-page-bg text-ink text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
-            <ArrowLeftRight className="w-4 h-4 text-primary" />
-            <span>Transfer Stock</span>
+            <ArrowLeftRight className="w-3.5 h-3.5 text-primary" />
+            Transfer Stock
           </button>
           <button
             onClick={() => setShowAdjustmentModal(true)}
-            className="h-10 px-3.5 rounded-sm bg-surface border border-border hover:bg-page-bg text-ink text-body font-medium flex items-center gap-1.5 shadow-elevation-1 transition-colors"
+            className="px-3 py-2 rounded-sm bg-surface border border-border hover:bg-page-bg text-ink text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
-            <SlidersHorizontal className="w-4 h-4 text-primary" />
-            <span>Stock Adjustment</span>
+            <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+            Adjust Stock
           </button>
           <button
             onClick={() => setShowDamageModal(true)}
-            className="h-10 px-3.5 rounded-sm bg-surface border border-border hover:bg-page-bg text-danger text-body font-medium flex items-center gap-1.5 shadow-elevation-1 transition-colors"
+            className="px-3 py-2 rounded-sm bg-surface border border-border hover:bg-page-bg text-danger text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
-            <AlertTriangle className="w-4 h-4 text-danger" />
-            <span>Report Loss/Damage</span>
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Report Loss
           </button>
           <button
             onClick={loadData}
-            title="Refresh records"
-            className="h-10 w-10 flex items-center justify-center rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors shadow-elevation-1"
+            title="Refresh"
+            className="p-2 flex items-center justify-center rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-primary" : ""}`} />
           </button>
         </div>
       </div>
 
-      {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="p-4 rounded-md bg-surface border border-border shadow-elevation-1 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-sm bg-primary/10 flex items-center justify-center text-primary shrink-0">
-            <Package className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-caption font-medium text-text-muted">Total Stock Units</p>
-            <p className="text-h3 font-bold text-ink">{stats.totalItemsInStock.toLocaleString()}</p>
-          </div>
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Stock Units</p>
+          <p className="text-h2 font-bold text-ink mt-1 tabular-nums">{stats.totalItemsInStock.toLocaleString()}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">In warehouse</p>
         </div>
 
-        <div className="p-4 rounded-md bg-surface border border-border shadow-elevation-1 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-sm bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
-            <DollarSign className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-caption font-medium text-text-muted">Inventory Valuation</p>
-            <p className="text-h3 font-bold text-ink">৳{stats.totalValuation.toLocaleString()}</p>
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Valuation</p>
+          <p className="text-h2 font-bold text-ink mt-1 tabular-nums">৳{stats.totalValuation.toLocaleString()}</p>
+          <p className="text-[11px] text-success font-medium mt-0.5">At cost price</p>
         </div>
 
-        <div className="p-4 rounded-md bg-surface border border-border shadow-elevation-1 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-sm bg-rose-500/10 flex items-center justify-center text-rose-600 shrink-0">
-            <AlertCircle className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-caption font-medium text-text-muted">Low Stock Alerts</p>
-            <p className="text-h3 font-bold text-rose-600">{stats.lowStockItemsCount}</p>
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Low Stock</p>
+          <p className="text-h2 font-bold text-danger mt-1 tabular-nums">{stats.lowStockItemsCount}</p>
+          <p className="text-[11px] text-danger font-medium mt-0.5">Need replenishment</p>
         </div>
 
-        <div className="p-4 rounded-md bg-surface border border-border shadow-elevation-1 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-sm bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
-            <ArrowLeftRight className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-caption font-medium text-text-muted">In-Transit Transfers</p>
-            <p className="text-h3 font-bold text-ink">{stats.activeTransfersCount}</p>
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Transfers</p>
+          <p className="text-h2 font-bold text-ink mt-1 tabular-nums">{stats.activeTransfersCount}</p>
+          <p className="text-[11px] text-primary font-medium mt-0.5">In transit</p>
         </div>
 
-        <div className="p-4 rounded-md bg-surface border border-border shadow-elevation-1 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-sm bg-amber-500/10 flex items-center justify-center text-amber-600 shrink-0">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-caption font-medium text-text-muted">Open Loss Reports</p>
-            <p className="text-h3 font-bold text-amber-600">{stats.damageLossReportsCount}</p>
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Loss Reports</p>
+          <p className="text-h2 font-bold text-warning mt-1 tabular-nums">{stats.damageLossReportsCount}</p>
+          <p className="text-[11px] text-warning font-medium mt-0.5">Pending review</p>
         </div>
       </div>
 
-      {/* Main Tabs Navigation */}
-      <div className="flex border-b border-border gap-6 text-body font-medium">
+      {/* Tab Navigation */}
+      <div className="flex border-b border-border bg-surface px-3 rounded-t-sm overflow-x-auto">
         <button
           onClick={() => handleTabChange("balances")}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-colors ${
+          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
             activeTab === "balances"
-              ? "border-primary text-primary font-semibold"
+              ? "border-primary text-primary"
               : "border-transparent text-text-muted hover:text-ink"
           }`}
         >
-          <Warehouse className="w-4 h-4" />
-          <span>Stock Balances</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-page-bg text-text-muted">
+          <Warehouse className="w-3.5 h-3.5" />
+          <span>Balances</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
             {stockList.length}
           </span>
         </button>
 
         <button
           onClick={() => handleTabChange("transfers")}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-colors ${
+          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
             activeTab === "transfers"
-              ? "border-primary text-primary font-semibold"
+              ? "border-primary text-primary"
               : "border-transparent text-text-muted hover:text-ink"
           }`}
         >
-          <ArrowLeftRight className="w-4 h-4" />
-          <span>Stock Transfers</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-page-bg text-text-muted">
+          <ArrowLeftRight className="w-3.5 h-3.5" />
+          <span>Transfers</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
             {transfers.length}
           </span>
         </button>
 
         <button
           onClick={() => handleTabChange("adjustments")}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-colors ${
+          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
             activeTab === "adjustments"
-              ? "border-primary text-primary font-semibold"
+              ? "border-primary text-primary"
               : "border-transparent text-text-muted hover:text-ink"
           }`}
         >
-          <SlidersHorizontal className="w-4 h-4" />
+          <SlidersHorizontal className="w-3.5 h-3.5" />
           <span>Adjustments</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-page-bg text-text-muted">
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
             {adjustments.length}
           </span>
         </button>
 
         <button
           onClick={() => handleTabChange("tracking")}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-colors ${
+          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
             activeTab === "tracking"
-              ? "border-primary text-primary font-semibold"
+              ? "border-primary text-primary"
               : "border-transparent text-text-muted hover:text-ink"
           }`}
         >
-          <QrCode className="w-4 h-4" />
-          <span>Batch & Serial Tracking</span>
+          <QrCode className="w-3.5 h-3.5" />
+          <span>Tracking</span>
         </button>
 
         <button
           onClick={() => handleTabChange("damage-loss")}
-          className={`pb-3 flex items-center gap-2 border-b-2 transition-colors ${
+          className={`py-2.5 px-4 text-[13px] font-medium flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
             activeTab === "damage-loss"
-              ? "border-primary text-primary font-semibold"
+              ? "border-primary text-primary"
               : "border-transparent text-text-muted hover:text-ink"
           }`}
         >
-          <AlertTriangle className="w-4 h-4" />
-          <span>Damage & Loss (Module 74)</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[11px] bg-page-bg text-text-muted">
+          <AlertTriangle className="w-3.5 h-3.5" />
+          <span>Damage & Loss</span>
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
             {damageReports.length}
           </span>
         </button>

@@ -411,6 +411,20 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
       }
     }
 
+    // Validate stock availability (frontend guard — backend also enforces this strictly)
+    for (const l of lines) {
+      if (!l.productId || l.quantity <= 0) continue;
+      const available = typeof l.availableStock === "number" ? l.availableStock : 0;
+      if (l.quantity > available) {
+        setError(
+          `"${l.description || l.productId}" — অপর্যাপ্ত স্টক। ` +
+          `স্টকে আছে: ${available}, চাহিদা: ${l.quantity}. ` +
+          `(Insufficient stock: available ${available}, requested ${l.quantity}.)`
+        );
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -748,17 +762,34 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                             <input
                               type="number"
                               min="1"
+                              max={line.availableStock !== undefined && line.availableStock >= 0 ? line.availableStock : undefined}
                               value={line.quantity}
                               readOnly={line.trackingType === "SERIALIZED" && (line.serials?.length || 0) > 0}
                               onChange={(e) =>
                                 handleLineChange(index, "quantity", Math.max(1, parseInt(e.target.value) || 0))
                               }
-                              className={`w-full px-2.5 py-1.5 text-body rounded-sm border border-border bg-page-bg text-ink focus:border-primary focus:bg-surface outline-none text-right font-mono ${
+                              title={
+                                isLowStock
+                                  ? `অপর্যাপ্ত স্টক! স্টকে আছে: ${line.availableStock ?? 0} টি। (Insufficient stock: only ${line.availableStock ?? 0} available)`
+                                  : `Available in stock: ${line.availableStock ?? 0}`
+                              }
+                              className={`w-full px-2.5 py-1.5 text-body rounded-sm border bg-page-bg text-ink focus:bg-surface outline-none text-right font-mono transition-colors ${
+                                isLowStock
+                                  ? "border-danger focus:border-danger ring-1 ring-danger/40 text-danger font-bold"
+                                  : "border-border focus:border-primary"
+                              } ${
                                 line.trackingType === "SERIALIZED" && (line.serials?.length || 0) > 0 ? "opacity-75 cursor-not-allowed" : ""
                               }`}
                               required
                             />
+                            {isLowStock && (
+                              <p className="text-[10px] text-danger font-semibold mt-0.5 flex items-center gap-0.5">
+                                <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                Max: {line.availableStock ?? 0}
+                              </p>
+                            )}
                           </td>
+
                           <td className="p-2.5">
                             <input
                               type="number"

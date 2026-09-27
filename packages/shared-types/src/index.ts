@@ -660,7 +660,7 @@ export interface PurchaseOrderLineDto {
   lineTotal: number | string;
   receivedQuantity?: number;
   remainingQuantity?: number;
-  fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED";
+  fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED" | "CANCELLED";
   product?: {
     id: string;
     sku: string;
@@ -679,7 +679,7 @@ export interface PurchaseOrderDto {
   branchId: string;
   grandTotal: number | string;
   createdAt: string | Date;
-  fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED";
+  fulfillmentStatus?: "PENDING_RECEIPT" | "PARTIALLY_RECEIVED" | "FULLY_RECEIVED" | "CANCELLED";
   totalOrderedQuantity?: number;
   totalReceivedQuantity?: number;
   totalRemainingQuantity?: number;
@@ -1264,6 +1264,27 @@ export interface CreateSalesReturnRequest {
     unitPrice: number;
     serials?: string[];
   }[];
+}
+
+export interface InvoiceReturnableItemsDto {
+  invoice: InvoiceDto;
+  items: {
+    productId: string;
+    productName: string;
+    sku: string;
+    trackingType: "SERIALIZED" | "NON_SERIALIZED";
+    invoicedQuantity: number;
+    alreadyReturnedQuantity: number;
+    returnableQuantity: number;
+    unitPrice: number;
+    soldSerials: string[];
+  }[];
+  financials?: {
+    grandTotal: number;
+    totalPaid: number;
+    alreadyReturnedAmount: number;
+    currentDue: number;
+  };
 }
 
 export interface CustomerWalletTransactionDto {

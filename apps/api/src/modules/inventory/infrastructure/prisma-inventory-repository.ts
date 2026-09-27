@@ -262,14 +262,30 @@ export class PrismaInventoryRepository {
 
       // 4. If product is SERIALIZED, transition physical units from source warehouse
       if (transfer.product?.trackingType === "SERIALIZED" && tx.serialNumber) {
-        const unitsToTransfer = await tx.serialNumber.findMany({
-          where: {
-            productId: data.productId,
-            warehouseId: data.fromWarehouseId,
-            currentStage: "IN_STOCK",
-          },
-          take: Number(data.quantity),
-        });
+        let unitsToTransfer: any[] = [];
+        const requestedSerials = (data as any).serials as string[] | undefined;
+        if (requestedSerials && requestedSerials.length > 0) {
+          unitsToTransfer = await tx.serialNumber.findMany({
+            where: {
+              serial: { in: requestedSerials },
+              productId: data.productId,
+              warehouseId: data.fromWarehouseId,
+              currentStage: "IN_STOCK",
+            },
+          });
+          if (unitsToTransfer.length !== requestedSerials.length) {
+            throw new Error(`One or more requested serials are not available in IN_STOCK status at source warehouse.`);
+          }
+        } else {
+          unitsToTransfer = await tx.serialNumber.findMany({
+            where: {
+              productId: data.productId,
+              warehouseId: data.fromWarehouseId,
+              currentStage: "IN_STOCK",
+            },
+            take: Number(data.quantity),
+          });
+        }
 
         for (const unit of unitsToTransfer) {
           await tx.serialNumber.update({

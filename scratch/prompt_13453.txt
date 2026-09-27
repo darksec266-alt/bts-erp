@@ -1,0 +1,1011 @@
+<USER_REQUEST>
+Application UI/UX Redesign & Controlled Feature Enhancement
+You are working on an existing business application.
+
+Your primary task is to redesign and improve the UI/UX without breaking the existing application.
+
+There are also a few explicitly authorized feature enhancements described at the end of this document. Only those requested enhancements may introduce new functionality.
+
+1. ABSOLUTE RULE — PROTECT EXISTING FUNCTIONALITY
+The existing application is already functional.
+
+Do NOT unnecessarily modify, remove, rewrite, refactor, or replace existing:
+
+Business logic
+
+Data flow
+
+API behavior
+
+Database structure
+
+Existing calculations
+
+Existing validation
+
+Existing workflows
+
+Existing modules
+
+Existing permissions
+
+Existing integrations
+
+Existing processing logic
+
+Existing feature behavior
+
+Golden Rule
+Existing functionality must continue to work exactly as before unless a change is explicitly requested in this document.
+
+Do not use the UI redesign as an excuse to rewrite the application's internal logic.
+
+If a UI improvement can be achieved without changing functionality, always choose the UI-only approach.
+
+2. IMPORTANT EXCEPTION — AUTHORIZED NEW FEATURES
+The following feature additions are explicitly authorized:
+
+Customer creation improvements
+
+Product creation improvements
+
+Product warranty information
+
+Warranty linkage with invoices
+
+Warranty/service management
+
+Sales VAT enable/disable
+
+VAT calculation and reporting
+
+Purchase tax enable/disable
+
+Purchase tax reporting
+
+These are the ONLY new functional areas that may be introduced as part of this task.
+
+Do not invent unrelated new features.
+
+3. FIX CURRENT UI PROBLEMS FIRST
+The following issues currently exist and must be corrected.
+
+3.1 Module Dashboard Icons
+The icons from the individual module dashboards have disappeared.
+
+Restore the appropriate module dashboard icons.
+
+Every module dashboard should have a visually consistent icon system.
+
+Do not use random icons.
+
+Icons should clearly represent the module's purpose.
+
+4. REMOVE ALL BANGLA FROM THE UI
+The application UI must be 100% English.
+
+The following text is currently incorrect:
+
+Due Adjusted (বাকি কর্তন)
+
+The Bangla portion:
+
+(বাকি কর্তন)
+
+must be completely removed.
+
+Use only:
+
+Due Adjusted
+
+Search the entire application for Bangla text and remove/replace every Bangla UI label.
+
+Check:
+
+Menus
+
+Submenus
+
+Buttons
+
+Tables
+
+Forms
+
+Status labels
+
+Tooltips
+
+Notifications
+
+Dialogs
+
+Empty states
+
+Error messages
+
+Reports
+
+Headers
+
+Footers
+
+Placeholders
+
+Descriptions
+
+There must be no Bangla anywhere in the application UI.
+
+5. REMOVE TECHNICAL MODULE NAMES FROM USER-FACING UI
+Text such as:
+
+Service-Only Customer (Module 72)
+
+must NOT appear anywhere in the user-facing application.
+
+Do not expose:
+
+Module numbers
+
+Internal IDs
+
+Developer names
+
+Database names
+
+Internal implementation names
+
+Technical module identifiers
+
+The user should only see a clean business-friendly name.
+
+For example, if the module represents customers, simply use:
+
+Customers
+
+or an appropriate professional business name.
+
+Determine the correct user-facing label from the module's actual purpose.
+
+6. SUBMENU NAVIGATION BEHAVIOR
+When a user clicks a submenu item:
+
+Open ONLY that selected operation/module page.
+
+Do NOT open unnecessary additional tabs.
+
+Do NOT show a tab bar at the top of the page.
+
+Do NOT duplicate the same navigation structure in multiple places.
+
+Example:
+
+Operations
+├── Customers
+├── Products
+├── Sales
+└── Purchases
+
+If the user clicks:
+
+Products
+
+the application should open the Products page directly.
+
+There should NOT be:
+
+Products | Sales | Purchases | ...
+
+as an additional tab system at the top.
+
+7. NO TOP TAB NAVIGATION
+The current top tabs must be removed.
+
+Do not create a second navigation system at the top.
+
+The main navigation should be controlled through the hamburger/sidebar menu.
+
+The content area should focus only on the currently selected operation.
+
+8. HAMBURGER MENU SHOULD SHOW WORKFLOW CONTEXT
+The hamburger/sidebar menu should communicate the sequence of modules.
+
+For example:
+
+☰
+
+Dashboard
+
+Customers
+
+Products
+
+Sales
+
+Purchases
+
+Inventory
+
+Service & Warranty
+
+Reports
+
+Settings
+
+If modules have a natural workflow relationship, organize them accordingly.
+
+Example:
+
+Master Data
+  Customers
+  Products
+  Suppliers
+
+Sales
+  Invoices
+  Payments
+  Returns
+
+Purchases
+  Purchase Orders
+  Purchases
+  Returns
+
+Service
+  Warranty
+  Service Requests
+
+Use the actual existing modules.
+
+Do not invent unrelated modules.
+
+9. IMPORTANT — FIX SUBMENU SELECTION BUG
+Currently, when one submenu is selected, all submenus become selected.
+
+This is incorrect.
+
+Only the currently active submenu should have the active/selected state.
+
+Example:
+
+Operations
+  Customers       ← active
+  Products
+  Suppliers
+
+NOT:
+
+Operations
+  Customers       ← active
+  Products        ← active
+  Suppliers       ← active
+
+The active state must be independent for every submenu item.
+
+When the user navigates to another page:
+
+Products
+
+then:
+
+Operations
+  Customers
+  Products        ← active
+  Suppliers
+
+Only one relevant operation should visually appear selected.
+
+10. MODULE NAVIGATION STRUCTURE
+Use:
+
+Main Menu
+    ↓
+Submenu
+    ↓
+Selected Operation
+    ↓
+Dedicated Page
+
+Do not use:
+
+Main Menu
+    ↓
+Popup
+    ↓
+Nested Popup
+    ↓
+Another Popup
+
+Major operations should have dedicated pages.
+
+11. CUSTOMER CREATION — ADD USEFUL ACTION OPTIONS
+When creating or editing a customer, investigate the existing customer workflow and introduce useful optional actions/toggles.
+
+Do not make everything mandatory.
+
+Potential options include:
+
+Customer Status
+Active
+Inactive
+
+Customer Type
+Individual
+Business
+Corporate
+Wholesale
+Retail
+
+Only include categories that make sense for the existing application's business model.
+
+Credit / Due Settings
+Where applicable:
+
+Allow Credit
+Credit Limit
+Payment Terms
+
+Customer Features
+Potential optional toggles:
+
+Allow Due Sales
+Enable Notifications
+Enable Invoice Notifications
+Enable Payment Reminders
+
+Customer Identification
+Where relevant:
+
+Customer Code
+Phone
+Email
+Address
+Tax/VAT Information
+Business Name
+Contact Person
+
+Do not add unnecessary fields just to make the form larger.
+
+The objective is:
+
+Useful configuration without making customer creation complicated.
+
+12. PRODUCT CREATION — ADD USEFUL ACTION OPTIONS
+When creating or editing a product, provide relevant optional configuration.
+
+Investigate the product workflow and use appropriate toggles such as:
+
+Track Stock
+Track Serial Number
+Track Batch
+Enable Warranty
+Enable Tax
+Enable VAT
+Allow Discount
+Allow Sale
+Allow Purchase
+
+Only display options that are actually relevant to the application's existing inventory/sales behavior.
+
+13. PRODUCT WARRANTY CONFIGURATION
+Products should be able to have warranty information.
+
+Potential fields:
+
+Warranty
+[ON/OFF]
+
+Warranty Type
+[Manufacturer / Seller / Service / Other]
+
+Warranty Period
+[12] [Months]
+
+Warranty Start
+[Sale Date / Activation Date]
+
+Warranty Coverage
+[Description]
+
+Warranty Terms
+[Description]
+
+Where relevant, support:
+
+Warranty duration
+
+Warranty type
+
+Warranty coverage
+
+Warranty exclusions
+
+Warranty start date
+
+Warranty expiry date
+
+Serial number association
+
+The warranty record should be connected to the sold product/invoice.
+
+Warranty systems commonly use serial/product history and link warranty claims back to the original invoice or purchase record. 
+S
+SORS ERP
++1
+
+14. INVOICE → WARRANTY CONNECTION
+When creating an invoice/bill, products that have warranty enabled should carry their warranty information into the sale.
+
+Example:
+
+Product
+Laptop XYZ
+
+Warranty
+12 Months
+
+Warranty Expiry
+28 Sep 2027
+
+The invoice should retain the relationship between:
+
+Customer
+    ↓
+Invoice
+    ↓
+Product
+    ↓
+Serial Number (if applicable)
+    ↓
+Warranty
+
+Do not create a disconnected warranty record.
+
+15. WARRANTY / SERVICE MANAGEMENT
+Warranty information from invoices should later be usable for service/warranty management.
+
+The service/warranty workflow should be able to identify:
+
+Customer
+Product
+Invoice
+Purchase Date
+Serial Number
+Warranty Type
+Warranty Period
+Warranty Expiry
+Warranty Status
+
+Possible warranty status:
+
+Active
+Expiring Soon
+Expired
+Claimed
+Under Service
+Completed
+
+Do not create statuses that conflict with the existing application's business logic.
+
+16. WARRANTY SERVICE WORKFLOW
+The UI should support a clear workflow such as:
+
+Invoice
+   ↓
+Warranty Record
+   ↓
+Service / Warranty Request
+   ↓
+Inspection
+   ↓
+Service / Repair
+   ↓
+Resolution
+   ↓
+Completed
+
+Possible resolution types:
+
+Repair
+Replacement
+Refund
+Rejected
+Out of Warranty
+
+Only implement the resolution types that are appropriate to the application's actual business model.
+
+Warranty/RMA systems commonly track claim status, inspection, repair/replacement/refund, parts/service charges, and warranty reports. 
+S
+SORS ERP
++1
+
+17. SALES INVOICE — VAT
+VAT must be supported at the invoice level.
+
+The seller should have the ability to enable or disable VAT for a sale.
+
+Example:
+
+VAT
+[ ON ]
+
+VAT Rate
+[ 15% ]
+
+VAT Amount
+৳ XXX
+
+Or:
+
+VAT
+[ OFF ]
+
+When VAT is disabled, the invoice should clearly show that no VAT has been applied.
+
+Do not silently calculate VAT when the seller has disabled it.
+
+18. VAT CALCULATION
+When VAT is enabled, clearly separate:
+
+Subtotal
+Discount
+Taxable Amount
+VAT
+Grand Total
+
+If the application supports VAT-inclusive pricing, clearly distinguish:
+
+VAT Inclusive
+
+from:
+
+VAT Exclusive
+
+Do not make the user guess whether the displayed product price already contains VAT.
+
+19. PRODUCT-LEVEL VAT CONFIGURATION
+Where appropriate, products should have VAT configuration.
+
+For example:
+
+VAT Applicable
+[ ON/OFF ]
+
+VAT Rate
+[ % ]
+
+However, the invoice must retain the actual VAT treatment used for that transaction.
+
+Changing a product's future VAT setting must not unexpectedly rewrite historical invoices.
+
+20. VAT REPORTING
+The system should provide reporting showing how much VAT was collected from customers.
+
+The report should support at minimum:
+
+Date Range
+Invoice
+Customer
+Sales Amount
+Taxable Amount
+VAT Rate
+VAT Amount
+Total
+
+Example:
+
+VAT Sales Report
+
+Period: 01 Sep 2026 – 30 Sep 2026
+
+Total Sales        ৳ XXX
+Taxable Sales      ৳ XXX
+VAT Collected      ৳ XXX
+
+Allow filtering by:
+
+Date
+
+Customer
+
+Invoice
+
+Product
+
+VAT rate
+
+Status
+
+Existing VAT systems commonly provide sales registers, purchase registers and VAT-specific reporting. 
+N
+NBR Approved VAT Software | Uddogi
++1
+
+21. PURCHASE — TAX OPTION
+During purchase entry, provide an option to enable or disable tax.
+
+Example:
+
+Tax
+[ ON ]
+
+Tax Rate
+[ % ]
+
+or:
+
+Tax
+[ OFF ]
+
+The purchase calculation should clearly show:
+
+Purchase Subtotal
+Discount
+Taxable Amount
+Tax
+Grand Total
+
+Do not force tax onto every purchase if the user has explicitly disabled it.
+
+22. PURCHASE TAX REPORT
+Purchase tax must be reportable later.
+
+Provide a report that can show:
+
+Purchase Tax Report
+
+Date
+Supplier
+Purchase Invoice
+Taxable Amount
+Tax Rate
+Tax Amount
+Total
+
+Summary:
+
+Total Purchases
+Taxable Purchases
+Total Purchase Tax
+
+Allow filtering by:
+
+Date range
+
+Supplier
+
+Invoice
+
+Product
+
+Tax rate
+
+23. SALES VAT VS PURCHASE TAX
+Keep these concepts clearly separated in the UI.
+
+Sales:
+
+Sales VAT
+VAT Collected
+Output VAT
+
+Purchase:
+
+Purchase Tax
+Input Tax
+
+Do not mix sales VAT and purchase tax into one unclear number.
+
+If the accounting/business rules later require net tax calculations, that should be presented as a separate report rather than changing the underlying transaction records.
+
+24. TAX/VAT DATA MUST BE TRACEABLE
+Every tax/VAT amount should be traceable back to its source transaction.
+
+For example:
+
+VAT Report
+   ↓
+Invoice #INV-1024
+   ↓
+Customer
+   ↓
+Products
+   ↓
+VAT calculation
+
+Similarly:
+
+Purchase Tax Report
+   ↓
+Purchase #PUR-2034
+   ↓
+Supplier
+   ↓
+Products
+   ↓
+Tax calculation
+
+This makes reporting auditable and easier to verify.
+
+25. HISTORICAL TRANSACTIONS MUST NOT CHANGE
+This is extremely important.
+
+If a product's:
+
+VAT rate
+Warranty
+Tax setting
+Price
+
+is changed later, historical invoices and purchases must remain unchanged.
+
+Example:
+
+If Product A was sold with:
+
+VAT = 15%
+
+and the product configuration is later changed, the old invoice must still show the original VAT treatment.
+
+Do not recalculate historical transactions based on current product settings.
+
+26. UI FOR TAX/VAT SHOULD BE SIMPLE
+Do not overload the invoice screen.
+
+Use a compact structure:
+
+Subtotal              ৳ 10,000
+Discount              ৳    500
+Taxable Amount        ৳  9,500
+VAT 15%               ৳  1,425
+────────────────────────────
+Grand Total           ৳ 10,925
+
+Provide a clear:
+
+VAT [ ON ]
+
+toggle when appropriate.
+
+27. REPORTING DASHBOARD
+Reports should eventually provide clear sections for:
+
+Sales
+Purchases
+VAT
+Tax
+Warranty
+Service
+Customers
+Products
+
+For example:
+
+VAT & Tax
+
+VAT Collected
+Purchase Tax
+Taxable Sales
+Taxable Purchases
+
+And:
+
+Warranty
+
+Active Warranties
+Expiring Soon
+Expired
+Open Claims
+Completed Services
+
+Do not put all reports onto one giant dashboard.
+
+28. UI DESIGN PRINCIPLES
+The redesigned application must be:
+
+Clean
+
+Modern
+
+Professional
+
+Minimal
+
+User-friendly
+
+Consistent
+
+Responsive
+
+Easy to navigate
+
+English-only
+
+Avoid:
+
+Excessive cards
+
+Excessive borders
+
+Excessive gradients
+
+Excessive rounded elements
+
+Unnecessary animations
+
+Duplicate navigation
+
+Unnecessary tabs
+
+Excessive text
+
+Developer terminology
+
+AI-related UI wording
+
+29. ONE SCREEN = ONE PURPOSE
+Every page should answer:
+
+What am I looking at?
+
+and:
+
+What can I do here?
+
+Major operations should have dedicated pages.
+
+Use popups only for:
+
+Confirmation
+
+Warning
+
+Small quick actions
+
+Short forms
+
+Do not put an entire workflow inside a popup.
+
+30. FINAL NAVIGATION MODEL
+The application should generally follow:
+
+☰ Main Menu
+│
+├── Dashboard
+│
+├── Customers
+│
+├── Products
+│
+├── Sales
+│   ├── Invoices
+│   ├── Payments
+│   └── Returns
+│
+├── Purchases
+│   ├── Purchases
+│   ├── Payments
+│   └── Returns
+│
+├── Inventory
+│
+├── Service & Warranty
+│   ├── Warranty
+│   ├── Service Requests
+│   └── Service History
+│
+├── Reports
+│   ├── Sales
+│   ├── Purchases
+│   ├── VAT
+│   ├── Tax
+│   ├── Warranty
+│   └── Service
+│
+└── Settings
+
+This is a structural guideline only.
+
+Use the application's actual existing modules and operations.
+
+Do not create duplicate functionality.
+
+31. FINAL VALIDATION CHECKLIST
+Before considering the work complete, verify:
+
+UI
+ All UI text is English.
+
+ No Bangla text remains.
+
+ "Due Adjusted (বাকি কর্তন)" is corrected to "Due Adjusted".
+
+ Module dashboard icons are restored.
+
+ Internal module numbers are hidden.
+
+ "Service-Only Customer (Module 72)" is removed.
+
+ Top navigation tabs are removed.
+
+ Hamburger/sidebar navigation is used.
+
+ Only the selected submenu is highlighted.
+
+ Submenu selection does not activate every submenu.
+
+ Navigation is logically organized.
+
+ Major operations use dedicated pages.
+
+ Unnecessary popups are removed.
+
+ UI is responsive.
+
+ UI has consistent styling.
+
+Existing Functionality
+ Existing features still work.
+
+ Existing APIs still work.
+
+ Existing data flow is preserved.
+
+ Existing business logic is preserved.
+
+ Existing validation is preserved.
+
+ Existing database behavior is preserved.
+
+ Existing workflows are preserved.
+
+Authorized Enhancements
+ Customer creation options improved.
+
+ Product creation options improved.
+
+ Warranty can be configured for applicable products.
+
+ Warranty is linked to sold products/invoices.
+
+ Warranty can be accessed for future service management.
+
+ Invoice supports VAT enable/disable.
+
+ VAT amount is clearly shown.
+
+ VAT data is reportable.
+
+ Purchase supports tax enable/disable.
+
+ Purchase tax is clearly shown.
+
+ Purchase tax is reportable.
+
+ Historical transactions remain unchanged.
+
+ Sales VAT and purchase tax remain logically separated.
+
+FINAL INSTRUCTION
+Do not redesign the application from scratch.
+
+Improve the existing application.
+
+Preserve everything that already works.
+
+Fix the current UI/navigation issues.
+
+Add only the explicitly authorized Customer, Product, Warranty, VAT and Purchase Tax enhancements described above.
+
+The final result should feel like a professional business application designed by an experienced product/UI team, not an AI-generated interface.
+
+Most importantly:
+
+Do not break existing functionality while improving the UI and adding the explicitly authorized enhancements.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-28T02:43:38+06:00.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Claude Sonnet 4.6 (Thinking). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

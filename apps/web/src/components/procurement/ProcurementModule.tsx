@@ -362,55 +362,53 @@ export const ProcurementModule: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Header & Main Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-h1 text-ink font-bold tracking-tight">
-            Procurement & Sourcing
-          </h1>
-          <p className="text-body text-text-muted mt-1">
-            Enterprise sourcing, vendor contracts, purchase requisitions, orders, and goods receipts.
+          <h1 className="text-h1 text-ink font-bold tracking-tight">Procurement</h1>
+          <p className="text-[13px] text-text-muted mt-0.5">
+            Suppliers, purchase requests, orders, and goods receipts.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => fetchData(true)}
             disabled={loading || refreshing}
-            title="Refresh database records"
-            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50 shadow-elevation-1"
+            title="Refresh"
+            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing || loading ? "animate-spin text-primary" : ""}`} />
           </button>
 
           <button
             onClick={handleExportCsv}
-            className="px-3.5 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-body font-medium text-ink flex items-center gap-2 transition-colors shadow-elevation-1"
+            className="px-3 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-[13px] font-medium text-ink flex items-center gap-1.5 transition-colors"
           >
-            <Download className="w-4 h-4 text-text-muted" />
-            <span>Export CSV</span>
+            <Download className="w-3.5 h-3.5 text-text-muted" />
+            Export
           </button>
 
           {activeTab === "suppliers" && (
             <button
               onClick={() => setSupplierModalOpen(true)}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>New Supplier</span>
+              <Plus className="w-3.5 h-3.5" />
+              New Supplier
             </button>
           )}
 
           {activeTab === "purchase-requests" && (
             <button
               onClick={() => setPrModalOpen(true)}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>New Requisition</span>
+              <Plus className="w-3.5 h-3.5" />
+              New Requisition
             </button>
           )}
 
@@ -420,10 +418,10 @@ export const ProcurementModule: React.FC = () => {
                 setSelectedPrForPo(undefined);
                 setPoModalOpen(true);
               }}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Generate PO</span>
+              <Plus className="w-3.5 h-3.5" />
+              Generate PO
             </button>
           )}
 
@@ -437,164 +435,117 @@ export const ProcurementModule: React.FC = () => {
                   addToast("info", "Please create a Purchase Order before recording Goods Receipts.");
                 }
               }}
-              className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+              className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Receive Goods</span>
+              <Plus className="w-3.5 h-3.5" />
+              Receive Goods
             </button>
           )}
         </div>
       </div>
 
-      {/* 4 KPI Summary Cards (ui.md §8) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Spend */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Total Spend
-            </span>
-            <div className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
-              ৳{stats.totalSpend.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
-            </div>
-            <span className="text-[12px] text-text-muted mt-0.5 block">
-              Across confirmed POs
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-primary-tint flex items-center justify-center text-primary shrink-0">
-            <DollarSign className="w-6 h-6" />
-          </div>
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Spend</p>
+          <p className="text-h2 font-bold text-ink mt-1 tabular-nums font-mono">
+            ৳{stats.totalSpend.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+          </p>
+          <p className="text-[11px] text-text-muted mt-0.5">Confirmed POs</p>
         </div>
 
-        {/* Purchase Orders */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Purchase Orders
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums font-mono">
-              {stats.totalPOs}
-            </div>
-            <span className="text-[12px] text-text-muted mt-0.5 block">
-              Active vendor contracts
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-purple-tint flex items-center justify-center text-purple shrink-0">
-            <ShoppingCart className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Purchase Orders</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.totalPOs}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Vendor contracts</p>
         </div>
 
-        {/* Pending Requisitions */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Requisition Pipeline
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-display font-bold text-ink tabular-nums font-mono">
-                {stats.pendingPRs}
-              </span>
-              <span className="text-caption text-text-muted">pending review</span>
-            </div>
-            <span className="text-[12px] font-medium mt-0.5 block">
-              {stats.pendingPRs > 0 ? (
-                <span className="text-warning font-medium">Awaiting management approval</span>
-              ) : approvedPendingPoCount > 0 ? (
-                <span className="text-primary font-semibold">⚡ {approvedPendingPoCount} approved awaiting PO</span>
-              ) : (
-                <span className="text-success font-medium">All PRs completed</span>
-              )}
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-warning-tint flex items-center justify-center text-warning shrink-0">
-            <Clock className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Requisitions</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.pendingPRs}</p>
+          <p className="text-[11px] mt-0.5">
+            {stats.pendingPRs > 0 ? (
+              <span className="text-warning font-medium">Awaiting approval</span>
+            ) : approvedPendingPoCount > 0 ? (
+              <span className="text-primary font-medium">{approvedPendingPoCount} approved, no PO</span>
+            ) : (
+              <span className="text-success font-medium">All completed</span>
+            )}
+          </p>
         </div>
 
-        {/* Active Suppliers */}
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Active Suppliers
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums font-mono">
-              {stats.activeSuppliers}
-            </div>
-            <span className="text-[12px] text-success font-medium mt-0.5 block">
-              Verified vendors
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-success-tint flex items-center justify-center text-success shrink-0">
-            <Truck className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active Suppliers</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.activeSuppliers}</p>
+          <p className="text-[11px] text-success font-medium mt-0.5">Verified vendors</p>
         </div>
       </div>
 
       {/* Tabs & Filter Bar */}
       <div className="space-y-4">
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-border bg-surface px-4 rounded-t-md overflow-x-auto">
+        {/* Tab Navigation */}
+        <div className="flex border-b border-border bg-surface px-3 rounded-t-sm overflow-x-auto">
           <button
             onClick={() => handleTabChange("suppliers")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
               activeTab === "suppliers"
-                ? "border-primary text-primary font-semibold"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-ink"
             }`}
           >
-            <Truck className="w-4 h-4" />
+            <Truck className="w-3.5 h-3.5" />
             <span>Suppliers</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
               {suppliers.length}
             </span>
           </button>
 
           <button
             onClick={() => handleTabChange("purchase-requests")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
               activeTab === "purchase-requests"
-                ? "border-primary text-primary font-semibold"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-ink"
             }`}
           >
-            <FileText className="w-4 h-4" />
-            <span>Purchase Requisitions</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
+            <FileText className="w-3.5 h-3.5" />
+            <span>Requisitions</span>
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
               {purchaseRequests.length}
             </span>
             {stats.pendingPRs > 0 && (
-              <span className="text-caption px-1.5 py-0.2 rounded-full bg-warning-tint text-warning font-semibold">
-                {stats.pendingPRs} pending
+              <span className="text-[11px] px-1.5 py-0.5 rounded bg-warning-tint text-warning font-semibold">
+                {stats.pendingPRs}
               </span>
             )}
           </button>
 
           <button
             onClick={() => handleTabChange("purchase-orders")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
               activeTab === "purchase-orders"
-                ? "border-primary text-primary font-semibold"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-ink"
             }`}
           >
-            <ShoppingCart className="w-4 h-4" />
+            <ShoppingCart className="w-3.5 h-3.5" />
             <span>Purchase Orders</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
               {purchaseOrders.length}
             </span>
           </button>
 
           <button
             onClick={() => handleTabChange("grn")}
-            className={`py-3 px-5 text-body font-medium border-b-2 flex items-center gap-2 whitespace-nowrap transition-all ${
+            className={`py-2.5 px-4 text-[13px] font-medium border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
               activeTab === "grn"
-                ? "border-primary text-primary font-semibold"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-ink"
             }`}
           >
-            <FileCheck className="w-4 h-4" />
-            <span>Goods Receipt (GRN)</span>
-            <span className="text-caption px-1.5 py-0.2 rounded-full bg-page-bg border border-border">
+            <FileCheck className="w-3.5 h-3.5" />
+            <span>Goods Receipts</span>
+            <span className="text-[11px] px-1.5 py-0.5 rounded bg-page-bg text-text-muted ml-0.5">
               {grns.length}
             </span>
           </button>

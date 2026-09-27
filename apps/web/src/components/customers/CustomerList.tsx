@@ -196,108 +196,72 @@ export const CustomerList: React.FC<CustomerListProps> = ({ selectedBranchId }) 
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Page Title & Main Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-h1 text-ink font-bold tracking-tight">Customer Management</h1>
-          <p className="text-body text-text-muted mt-1">
-            Enterprise and retail client accounts, multi-location address books, and service scopes.
+          <h1 className="text-h1 text-ink font-bold tracking-tight">Customers</h1>
+          <p className="text-[13px] text-text-muted mt-0.5">
+            Client accounts, address books, and service scopes.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => fetchCustomers(true)}
             disabled={refreshing}
-            title="Refresh database records"
-            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50 shadow-elevation-1"
+            title="Refresh"
+            className="p-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-text-muted hover:text-ink transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-primary" : ""}`} />
           </button>
 
           <button
             onClick={handleExportCSV}
-            className="px-3.5 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-body font-medium text-ink flex items-center gap-2 transition-colors shadow-elevation-1"
+            className="px-3 py-2 rounded-sm border border-border bg-surface hover:bg-page-bg text-[13px] font-medium text-ink flex items-center gap-1.5 transition-colors"
           >
-            <Download className="w-4 h-4 text-text-muted" />
-            <span>Export CSV</span>
+            <Download className="w-3.5 h-3.5 text-text-muted" />
+            Export
           </button>
 
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+            className="px-3.5 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Customer</span>
+            <Plus className="w-3.5 h-3.5" />
+            New Customer
           </button>
         </div>
       </div>
 
-      {/* Metric / Stat Cards (ui.md §8) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Total Clients
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">{stats.total}</div>
-            <span className="text-[12px] text-text-muted mt-0.5 block">Stored in database</span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-primary-tint flex items-center justify-center text-primary">
-            <Users className="w-6 h-6" />
-          </div>
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Clients</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.total}</p>
+          <p className="text-[11px] text-text-muted mt-0.5">Registered</p>
         </div>
 
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Active Profiles
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {stats.total > 0 ? stats.active : 0}
-            </div>
-            <span className="text-[12px] text-success font-medium mt-0.5 block flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Operational
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-success-tint flex items-center justify-center text-success">
-            <UserCheck className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Active</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.total > 0 ? stats.active : 0}</p>
+          <p className="text-[11px] text-success font-medium mt-0.5 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Operational
+          </p>
         </div>
 
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Service-Only (Mod 72)
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {stats.serviceOnly}
-            </div>
-            <span className="text-[12px] text-teal font-medium mt-0.5 block">
-              Field Maintenance
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-teal-tint flex items-center justify-center text-teal">
-            <Wrench className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Service-Only</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{stats.serviceOnly}</p>
+          <p className="text-[11px] text-teal font-medium mt-0.5">Field Maintenance</p>
         </div>
 
-        <div className="p-5 rounded-md border border-border bg-surface shadow-elevation-1 flex items-center justify-between">
-          <div>
-            <span className="text-caption font-semibold text-text-muted uppercase tracking-wider">
-              Branch Coverage
-            </span>
-            <div className="text-display font-bold text-ink mt-1 tabular-nums">
-              {branches.length}
-            </div>
-            <span className="text-[12px] text-purple font-medium mt-0.5 block">Active Operating Hubs</span>
-          </div>
-          <div className="w-12 h-12 rounded-full bg-purple-tint flex items-center justify-center text-purple">
-            <Building2 className="w-6 h-6" />
-          </div>
+        <div className="p-4 rounded-sm border border-border bg-surface">
+          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Branches</p>
+          <p className="text-h1 font-bold text-ink mt-1 tabular-nums">{branches.length}</p>
+          <p className="text-[11px] text-purple font-medium mt-0.5">Operating Hubs</p>
         </div>
       </div>
 
@@ -391,39 +355,34 @@ export const CustomerList: React.FC<CustomerListProps> = ({ selectedBranchId }) 
       {/* Main Customers Data Table */}
       <div className="rounded-md border border-border bg-surface shadow-elevation-1 overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 mx-auto text-primary animate-spin" />
-            <p className="text-body text-text-muted">Loading live customer accounts from PostgreSQL...</p>
+          <div className="p-12 text-center space-y-2">
+            <RefreshCw className="w-6 h-6 mx-auto text-primary animate-spin" />
+            <p className="text-[13px] text-text-muted">Loading...</p>
           </div>
         ) : customers.length === 0 ? (
-          /* 100% PRODUCTION READY EMPTY STATE - NO DUMMY DATA */
-          <div className="p-16 text-center max-w-lg mx-auto space-y-4">
-            <div className="w-16 h-16 rounded-full bg-primary-tint mx-auto flex items-center justify-center text-primary">
-              <Users className="w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-h2 text-ink font-bold">No Customer Records Found</h3>
-              <p className="text-body text-text-muted mt-1">
-                {search || branchFilter || statusFilter !== "ALL" || typeFilter !== "ALL"
-                  ? "No customer matches the selected filters. Try clearing or relaxing your search query."
-                  : "The database is currently clean with zero customers. Click the button below to register your first production client."}
-              </p>
-            </div>
-            <div className="pt-2 flex items-center justify-center gap-3">
-              {search || branchFilter || statusFilter !== "ALL" || typeFilter !== "ALL" ? (
+          <div className="p-12 text-center max-w-md mx-auto space-y-3">
+            <Users className="w-10 h-10 mx-auto text-text-muted/30" />
+            <h3 className="text-[15px] font-semibold text-ink">No customers found</h3>
+            <p className="text-[13px] text-text-muted">
+              {search || branchFilter || statusFilter !== "ALL" || typeFilter !== "ALL"
+                ? "No results match your filters. Try adjusting your search."
+                : "No customers registered yet. Add the first one to get started."}
+            </p>
+            <div className="flex items-center justify-center gap-2 pt-1">
+              {(search || branchFilter || statusFilter !== "ALL" || typeFilter !== "ALL") && (
                 <button
                   onClick={resetFilters}
-                  className="px-4 py-2 rounded-sm border border-border text-body font-medium text-ink hover:bg-page-bg"
+                  className="px-3.5 py-2 rounded-sm border border-border text-[13px] font-medium text-ink hover:bg-page-bg"
                 >
                   Clear Filters
                 </button>
-              ) : null}
+              )}
               <button
                 onClick={() => setCreateModalOpen(true)}
-                className="px-5 py-2.5 rounded-sm bg-primary hover:bg-primary-hover text-white text-body font-medium flex items-center gap-2 shadow-sm transition-all"
+                className="px-4 py-2 rounded-sm bg-primary hover:bg-primary-hover text-white text-[13px] font-medium flex items-center gap-1.5"
               >
-                <Plus className="w-4 h-4" />
-                <span>Register First Customer</span>
+                <Plus className="w-3.5 h-3.5" />
+                New Customer
               </button>
             </div>
           </div>

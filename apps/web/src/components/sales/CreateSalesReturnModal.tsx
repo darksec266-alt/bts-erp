@@ -59,11 +59,18 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
   const [lineStates, setLineStates] = useState<Record<string, ReturnLineState>>({});
   const [creditToWallet, setCreditToWallet] = useState<boolean>(true);
   const [reason, setReason] = useState<string>("");
+  const [financials, setFinancials] = useState<{
+    grandTotal: number;
+    totalPaid: number;
+    alreadyReturnedAmount: number;
+    currentDue: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!isOpen || !invoice) {
       setReturnableItems([]);
       setLineStates({});
+      setFinancials(null);
       setError(null);
       return;
     }
@@ -79,6 +86,7 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
       .then(([retRes, whRes]) => {
         if (!isMounted) return;
         setReturnableItems(retRes.items || []);
+        setFinancials(retRes.financials || null);
         
         // Initialize line states
         const initialStates: Record<string, ReturnLineState> = {};
@@ -155,6 +163,16 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
     });
   };
 
+  // Financial computations
+  const grandTotal = financials ? financials.grandTotal : Number(invoice.grandTotal);
+  const totalPaid = financials
+    ? financials.totalPaid
+    : (invoice.payments || []).reduce((s, p) => s + Number(p.amount), 0);
+  const currentDue = financials
+    ? financials.currentDue
+    : Math.max(0, grandTotal - totalPaid);
+  const isDueBill = currentDue > 0;
+
   // Compute totals
   const activeReturnLines = returnableItems
     .map((item) => {
@@ -168,9 +186,17 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
     })
     .filter((l) => l.quantity > 0);
 
-  const totalRefundAmount = Number(
+  const totalReturnAmount = Number(
     activeReturnLines.reduce((acc, l) => acc + l.lineTotal, 0).toFixed(2)
   );
+
+  // User requirement: "JODI KONO CUSTOMER DUE BILL KORE TAHOLE TA RETURN KORLE KOKKHONOI WALLET A ADD HOBE NA. TA CURRENT DUE THEKE BAD JABE."
+  // 1. Amount deducted from due
+  const dueDeduction = Number(Math.min(totalReturnAmount, currentDue).toFixed(2));
+  // 2. Excess refund (only if customer paid cash exceeding the remaining bill)
+  const excessPaidRefund = Number(Math.max(0, totalReturnAmount - dueDeduction).toFixed(2));
+  // 3. Wallet credit amount
+  const walletCreditAmount = creditToWallet ? excessPaidRefund : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,7 +266,9 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
                 </span>
               </h2>
               <p className="text-caption text-text-muted">
-                Return goods to inventory and automatically credit customer wallet.
+                {isDueBill
+                  ? "Return goods to inventory and automatically offset outstanding due balance."
+                  : "Return goods to inventory and automatically credit customer wallet."}
               </p>
             </div>
           </div>
@@ -262,7 +290,7 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
           )}
 
           {/* Invoice Summary Banner */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-md border border-border bg-page-bg/30">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-3.5 rounded-md border border-border bg-page-bg/30">
             <div>
               <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
                 Customer
@@ -289,8 +317,23 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
                 Invoice Total
               </span>
               <p className="text-body font-mono font-bold text-ink mt-0.5">
-                ৳{Number(invoice.grandTotal).toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                ৳{grandTotal.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
               </p>
+              <span className="text-[10px] text-text-muted">
+                Paid: ৳{totalPaid.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
+                Current Due
+              </span>
+              <p className={`text-body font-mono font-bold mt-0.5 ${currentDue > 0 ? "text-danger" : "text-success"}`}>
+                ৳{currentDue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+              </p>
+              <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded inline-block mt-0.5 ${currentDue > 0 ? "bg-danger-tint text-danger" : "bg-success-tint text-success"}`}>
+                {currentDue > 0 ? "Outstanding" : "Fully Paid"}
+              </span>
             </div>
 
             <div>
@@ -479,10 +522,89 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
             )}
           </div>
 
-          {/* Refund & Wallet Settings */}
+          {/* Refund & Due Adjustment Settings */}
           <div className="p-4 rounded-md border border-border bg-page-bg/40 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <label className="flex items-start gap-3 cursor-pointer select-none">
+            {/* If Invoice has Due */}
+            {isDueBill ? (
+              <div className="p-3.5 rounded border border-amber-300/80 bg-amber-50/80 dark:bg-amber-950/20 dark:border-amber-800/50 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <h4 className="text-body font-bold text-amber-900 dark:text-amber-300">
+                      Due Bill Return Policy (বকেয়া বিল সমন্বয়)
+                    </h4>
+                    <p className="text-caption text-amber-800 dark:text-amber-400 leading-relaxed">
+                      এই ইনভয়েসের বকেয়া <strong>৳{currentDue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}</strong>। 
+                      নিয়ম অনুযায়ী রিটার্নের টাকা <strong>কখনোই ওয়ালেটে যোগ হবে না</strong>, তা সরাসরি বর্তমান বাকি থেকে বাদ যাবে।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-amber-200/80 dark:border-amber-800/40">
+                  <div className="bg-surface p-2.5 rounded border border-border">
+                    <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
+                      Total Return Value
+                    </span>
+                    <p className="text-h3 font-mono font-bold text-ink mt-0.5">
+                      ৳{totalReturnAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+
+                  <div className="bg-surface p-2.5 rounded border border-amber-300/80 dark:border-amber-800/60">
+                    <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider block">
+                      Deducted from Due
+                    </span>
+                    <p className="text-h3 font-mono font-bold text-amber-600 mt-0.5">
+                      -৳{dueDeduction.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[10px] text-text-muted">
+                      New Due: ৳{Math.max(0, currentDue - dueDeduction).toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="bg-surface p-2.5 rounded border border-border">
+                    <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
+                      Wallet Credit (ওয়ালেটে জমা)
+                    </span>
+                    <p className={`text-h3 font-mono font-bold mt-0.5 ${walletCreditAmount > 0 ? "text-emerald-600" : "text-text-muted"}`}>
+                      ৳{walletCreditAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                    </p>
+                    <span className="text-[10px] text-text-muted">
+                      {excessPaidRefund > 0
+                        ? `Excess paid refund credited`
+                        : `৳0 (No wallet credit)`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 rounded border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-800/40">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-body font-bold text-emerald-900 dark:text-emerald-300">
+                      Fully Paid Invoice (পরিশোধিত বিল)
+                    </span>
+                    <p className="text-caption text-emerald-800 dark:text-emerald-400 mt-0.5">
+                      ইনভয়েসটিতে কোনো বকেয়া নেই। সম্পূর্ণ রিটার্ন মূল্য গ্রাহকের ওয়ালেটে সরাসরি যোগ হবে।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right sm:border-l sm:border-emerald-200 dark:sm:border-emerald-800/40 sm:pl-6 shrink-0">
+                  <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
+                    Wallet Credit
+                  </span>
+                  <p className="text-h2 font-mono font-bold text-emerald-600">
+                    ৳{totalReturnAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Wallet Credit Toggle for excess/paid refunds */}
+            {excessPaidRefund > 0 && (
+              <label className="flex items-start gap-3 cursor-pointer select-none pt-1">
                 <input
                   type="checkbox"
                   checked={creditToWallet}
@@ -492,23 +614,14 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
                 <div>
                   <span className="text-body font-bold text-ink flex items-center gap-1.5">
                     <Wallet className="w-4 h-4 text-emerald-600" />
-                    <span>Credit Refund Directly to Customer Wallet</span>
+                    <span>Credit Excess Paid Amount to Customer Wallet</span>
                   </span>
                   <p className="text-caption text-text-muted mt-0.5">
-                    When enabled, ৳{totalRefundAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })} will be credited to {invoice.customer?.displayName || "the customer"}&apos;s wallet balance for future purchases or advance credit.
+                    ৳{excessPaidRefund.toLocaleString("en-BD", { minimumFractionDigits: 2 })} will be credited to {invoice.customer?.displayName || "customer"}&apos;s wallet balance.
                   </p>
                 </div>
               </label>
-
-              <div className="text-right sm:border-l sm:border-border sm:pl-6 shrink-0">
-                <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
-                  Total Refund Credit
-                </span>
-                <p className="text-h2 font-mono font-bold text-primary">
-                  ৳{totalRefundAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            </div>
+            )}
 
             <div>
               <label className="text-caption font-semibold text-text-muted block mb-1">
@@ -550,7 +663,11 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
               <>
                 <RotateCcw className="w-4 h-4" />
                 <span>
-                  Confirm Return (৳{totalRefundAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })})
+                  {dueDeduction > 0 && walletCreditAmount === 0
+                    ? `Confirm Return (-৳${dueDeduction.toLocaleString("en-BD", { minimumFractionDigits: 2 })} Due)`
+                    : dueDeduction > 0 && walletCreditAmount > 0
+                    ? `Confirm Return (-৳${dueDeduction.toFixed(2)} Due, +৳${walletCreditAmount.toFixed(2)} Wallet)`
+                    : `Confirm Return (৳${walletCreditAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })} Wallet)`}
                 </span>
               </>
             )}

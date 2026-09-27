@@ -169,7 +169,7 @@ export class PrismaCustomerRepository implements CustomerRepository {
       const grandTotal = Number(inv.grandTotal);
       const paidFromPayments = (inv.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
       const paidFromAdvances = (inv.advanceAdjustments || []).reduce((s: number, a: any) => s + Number(a.amountAdjusted), 0);
-      const returnedAmount = (inv.salesReturns || []).reduce((s: number, r: any) => s + Number(r.refundAmount), 0);
+      const returnedAmount = (inv.salesReturns || []).reduce((s: number, r: any) => s + Number(r.totalAmount || r.refundAmount || 0), 0);
       const totalPaid = Number((paidFromPayments + paidFromAdvances).toFixed(2));
       const dueAmount = Math.max(0, Number((grandTotal - totalPaid - returnedAmount).toFixed(2)));
       return {
@@ -190,7 +190,7 @@ export class PrismaCustomerRepository implements CustomerRepository {
 
     const totalInvoiced = Number(mappedInvoices.reduce((s: number, inv: any) => s + inv.grandTotal, 0).toFixed(2));
     const totalPaid = Number(mappedInvoices.reduce((s: number, inv: any) => s + inv.totalPaid, 0).toFixed(2));
-    const totalReturned = Number(salesReturns.reduce((s: number, r: any) => s + Number(r.refundAmount), 0).toFixed(2));
+    const totalReturned = Number(salesReturns.reduce((s: number, r: any) => s + Number(r.totalAmount || r.refundAmount || 0), 0).toFixed(2));
     const currentDue = Math.max(0, Number((totalInvoiced - totalPaid - totalReturned).toFixed(2)));
     const walletBalance = Number(customer.walletBalance || 0);
 
@@ -333,7 +333,7 @@ export class PrismaCustomerRepository implements CustomerRepository {
       const grandTotal = Number(invoice.grandTotal);
       const paid = (invoice.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0) +
         (invoice.advanceAdjustments || []).reduce((s: number, a: any) => s + Number(a.amountAdjusted), 0);
-      const returned = (invoice.salesReturns || []).reduce((s: number, r: any) => s + Number(r.refundAmount), 0);
+      const returned = (invoice.salesReturns || []).reduce((s: number, r: any) => s + Number(r.totalAmount || r.refundAmount || 0), 0);
       const due = Math.max(0, Number((grandTotal - paid - returned).toFixed(2)));
 
       if (due <= 0) {
