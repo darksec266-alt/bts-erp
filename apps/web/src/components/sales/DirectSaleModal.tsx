@@ -417,9 +417,9 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
       const available = typeof l.availableStock === "number" ? l.availableStock : 0;
       if (l.quantity > available) {
         setError(
-          `"${l.description || l.productId}" — অপর্যাপ্ত স্টক। ` +
-          `স্টকে আছে: ${available}, চাহিদা: ${l.quantity}. ` +
-          `(Insufficient stock: available ${available}, requested ${l.quantity}.)`
+          `"${l.description || l.productId}" — Insufficient stock. ` +
+          `Available: ${available}, Requested: ${l.quantity}.`
+
         );
         return;
       }
@@ -770,7 +770,7 @@ export const DirectSaleModal: React.FC<DirectSaleModalProps> = ({
                               }
                               title={
                                 isLowStock
-                                  ? `অপর্যাপ্ত স্টক! স্টকে আছে: ${line.availableStock ?? 0} টি। (Insufficient stock: only ${line.availableStock ?? 0} available)`
+          `Available: ${available}, Requested: ${l.quantity}.`
                                   : `Available in stock: ${line.availableStock ?? 0}`
                               }
                               className={`w-full px-2.5 py-1.5 text-body rounded-sm border bg-page-bg text-ink focus:bg-surface outline-none text-right font-mono transition-colors ${

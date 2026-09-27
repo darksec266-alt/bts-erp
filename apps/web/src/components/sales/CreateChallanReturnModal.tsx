@@ -155,7 +155,7 @@ export const CreateChallanReturnModal: React.FC<CreateChallanReturnModalProps> =
               <Undo2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-h2 font-semibold text-ink">Record Challan Return (Module 73)</h2>
+              <h2 className="text-h2 font-semibold text-ink">Record Challan Return</h2>
               <p className="text-caption text-text-muted mt-0.5">Return goods back to stock or file linked damage report</p>
             </div>
           </div>

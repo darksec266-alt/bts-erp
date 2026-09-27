@@ -322,7 +322,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({ selectedBranchId }) 
             >
               <option value="ALL">All Account Types</option>
               <option value="STANDARD">Standard (Hardware & Service)</option>
-              <option value="SERVICE_ONLY">Service-Only (Module 72)</option>
+              <option value="SERVICE_ONLY">Service-Only Customer</option>
             </select>
 
             {/* Status Filter */}

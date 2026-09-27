@@ -877,7 +877,7 @@ export const InventoryModule: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 5: Damage & Loss Reports (Module 74) */}
+      {/* Tab 5: Damage & Loss Reports */}
       {activeTab === "damage-loss" && (
         <div className="bg-surface rounded-md border border-border shadow-elevation-1 overflow-hidden">
           <div className="overflow-x-auto">

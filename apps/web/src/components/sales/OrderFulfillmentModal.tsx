@@ -84,7 +84,7 @@ export const OrderFulfillmentModal: React.FC<OrderFulfillmentModalProps> = ({
                 Fulfillment Status ({orderNumber || data?.orderNumber || "Sales Order"})
               </h2>
               <p className="text-caption text-text-muted mt-0.5">
-                Line-by-line fulfillment view per database-schema.md §27 / Module 73
+                Line-by-line fulfillment view for sales order dispatch
               </p>
             </div>
           </div>

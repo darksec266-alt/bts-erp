@@ -531,11 +531,11 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
                   <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
                     <h4 className="text-body font-bold text-amber-900 dark:text-amber-300">
-                      Due Bill Return Policy (বকেয়া বিল সমন্বয়)
+                      Due Bill Return Policy
                     </h4>
                     <p className="text-caption text-amber-800 dark:text-amber-400 leading-relaxed">
-                      এই ইনভয়েসের বকেয়া <strong>৳{currentDue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}</strong>। 
-                      নিয়ম অনুযায়ী রিটার্নের টাকা <strong>কখনোই ওয়ালেটে যোগ হবে না</strong>, তা সরাসরি বর্তমান বাকি থেকে বাদ যাবে।
+                      This invoice has an outstanding due of <strong>৳{currentDue.toLocaleString("en-BD", { minimumFractionDigits: 2 })}</strong>. 
+                      The return value will be applied directly to reduce the outstanding balance and <strong>will not be credited to the wallet</strong>.
                     </p>
                   </div>
                 </div>
@@ -564,7 +564,7 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
 
                   <div className="bg-surface p-2.5 rounded border border-border">
                     <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
-                      Wallet Credit (ওয়ালেটে জমা)
+                      Wallet Credit
                     </span>
                     <p className={`text-h3 font-mono font-bold mt-0.5 ${walletCreditAmount > 0 ? "text-emerald-600" : "text-text-muted"}`}>
                       ৳{walletCreditAmount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
@@ -583,10 +583,10 @@ export const CreateSalesReturnModal: React.FC<CreateSalesReturnModalProps> = ({
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="text-body font-bold text-emerald-900 dark:text-emerald-300">
-                      Fully Paid Invoice (পরিশোধিত বিল)
+                      Fully Paid Invoice
                     </span>
                     <p className="text-caption text-emerald-800 dark:text-emerald-400 mt-0.5">
-                      ইনভয়েসটিতে কোনো বকেয়া নেই। সম্পূর্ণ রিটার্ন মূল্য গ্রাহকের ওয়ালেটে সরাসরি যোগ হবে।
+                      This invoice has no outstanding balance. The full return value will be credited directly to the customer's wallet.
                     </p>
                   </div>
                 </div>

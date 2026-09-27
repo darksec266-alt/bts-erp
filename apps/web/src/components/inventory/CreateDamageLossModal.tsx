@@ -161,7 +161,7 @@ export const CreateDamageLossModal: React.FC<CreateDamageLossModalProps> = ({
             </div>
             <div>
               <h2 className="text-h2 font-semibold text-ink">File Damage & Loss Report</h2>
-              <p className="text-caption text-text-muted mt-0.5">Module 74: Document damaged, expired, or written-off inventory</p>
+              <p className="text-caption text-text-muted mt-0.5">Document damaged, expired, or written-off inventory items</p>
             </div>
           </div>
           <WindowHeaderActions

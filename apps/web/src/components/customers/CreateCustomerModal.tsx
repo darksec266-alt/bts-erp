@@ -205,7 +205,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
             <p className="text-[12px] text-text-muted mt-1">Must be unique per customer profile.</p>
           </div>
 
-          {/* Is Service Only (Module 72 Specification) */}
+          {/* Is Service Only Customer */}
           <div className="p-3 rounded-sm border border-border bg-page-bg/60 flex items-start gap-3">
             <input
               type="checkbox"
@@ -215,7 +215,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
               className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
             />
             <label htmlFor="isServiceOnly" className="cursor-pointer text-body">
-              <span className="font-semibold text-ink block">Service-Only Customer (Module 72)</span>
+              <span className="font-semibold text-ink block">Service-Only Customer</span>
               <span className="text-caption text-text-muted block">
                 Enable if this client receives installation, warranty, or field maintenance services without purchasing hardware.
               </span>

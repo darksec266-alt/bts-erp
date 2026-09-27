@@ -1,0 +1,822 @@
+<USER_REQUEST>
+Strict UI/UX Redesign Guidelines
+
+
+UI/UX Redesign — Strict Guidelines
+You are working on an existing application. Your task is to redesign and improve ONLY the UI/UX of the application.
+
+CRITICAL RULE
+DO NOT change, remove, rewrite, replace, optimize, or restructure any existing functionality, business logic, data flow, API behavior, database interaction, processing logic, calculations, validation logic, or feature behavior.
+
+The existing application functionality is considered final and locked.
+
+Your job is strictly limited to the presentation layer and user experience.
+
+If a UI improvement appears to require changing functionality or data flow, do not make that change. Find a UI-only solution instead.
+
+1. Functional Preservation
+Everything that currently works must continue to work exactly as before.
+
+Do NOT change:
+
+Existing features
+
+Business logic
+
+Application logic
+
+Data flow
+
+API calls
+
+API request/response structures
+
+Database operations
+
+Database schema
+
+State management logic
+
+Processing logic
+
+Calculations
+
+Validation rules
+
+Authentication/authorization behavior
+
+File processing behavior
+
+Import/export logic
+
+Existing integrations
+
+Existing workflows
+
+Existing feature capabilities
+
+Existing permissions
+
+Existing backend behavior
+
+Do NOT add new functionality unless it is strictly necessary for the UI itself.
+
+Golden Rule
+Same functionality + same data flow + same behavior, but significantly better UI/UX.
+
+2. No Feature Changes
+Do not interpret this redesign as an opportunity to "improve" the underlying product functionality.
+
+For example:
+
+Do not add new features.
+
+Do not remove existing features.
+
+Do not merge functional operations.
+
+Do not split backend operations.
+
+Do not change how an operation works.
+
+Do not change the order in which backend operations execute.
+
+Do not change data structures.
+
+Do not change existing business rules.
+
+You may reorganize how existing functionality is presented in the UI, as long as the underlying functionality remains unchanged.
+
+3. UI/UX Is the Only Scope
+You may modify:
+
+Layout
+
+Navigation presentation
+
+Sidebar
+
+Menus
+
+Submenus
+
+Collapsible sections
+
+Page structure
+
+Screen composition
+
+Spacing
+
+Typography
+
+Colors
+
+Icons
+
+Buttons
+
+Cards
+
+Tables
+
+Forms
+
+Tabs
+
+Breadcrumbs
+
+Headers
+
+Footers
+
+Empty states
+
+Loading states
+
+Error presentation
+
+Success presentation
+
+Responsive behavior
+
+Visual hierarchy
+
+Information density
+
+Component styling
+
+Component positioning
+
+UX flow presentation
+
+You may restructure the visual presentation of existing features, but not their underlying functionality.
+
+4. Remove Unnecessary UI Text
+Review the entire application for unnecessary or repetitive text.
+
+Remove or simplify:
+
+Redundant labels
+
+Repeated descriptions
+
+Excessive instructions
+
+Unnecessary status messages
+
+Repetitive headings
+
+Verbose button labels
+
+Developer-oriented terminology
+
+AI-related wording that is not necessary for the user
+
+Technical implementation details exposed in the UI
+
+The interface should feel like a professionally designed production application.
+
+It should not look AI-generated.
+
+Do not expose implementation details such as:
+
+"AI is thinking..."
+
+"AI generated..."
+
+"AI processing..."
+
+"Model is working..."
+
+"Prompt..."
+
+"Token..."
+
+Other unnecessary AI/system terminology
+
+unless such information is genuinely required by an existing feature.
+
+5. Language Requirement
+The entire application UI must use English only.
+
+Do not introduce Bangla anywhere in the UI.
+
+This includes:
+
+Navigation
+
+Menus
+
+Submenus
+
+Buttons
+
+Labels
+
+Tooltips
+
+Dialogs
+
+Notifications
+
+Error messages
+
+Empty states
+
+Forms
+
+Tables
+
+Status messages
+
+Help text
+
+Placeholders
+
+Breadcrumbs
+
+Use concise, natural, professional English.
+
+6. Navigation Redesign
+The current flat menu structure should be reorganized into a more logical hierarchical navigation system.
+
+Use:
+
+Main Menu → Submenu → Module → Operation
+
+Main menu items should be collapsible where appropriate.
+
+Example:
+
+Dashboard
+
+Operations
+  ├── Module 01
+  ├── Module 02
+  └── Module 03
+
+Reports
+  ├── Summary
+  ├── Detailed Reports
+  └── History
+
+Settings
+  ├── General
+  ├── Preferences
+  └── System
+
+This is only an example.
+
+Use the application's actual existing modules and features to determine the appropriate hierarchy.
+
+Do not invent new modules or features.
+
+7. Collapsible Sidebar
+The main navigation should support a collapsible sidebar.
+
+Expanded:
+
+Dashboard
+
+Operations
+  Module 01
+  Module 02
+  Module 03
+
+Reports
+Settings
+
+Collapsed:
+
+[icon]
+[icon]
+[icon]
+[icon]
+[icon]
+
+The collapsed state should remain usable and should provide tooltips where necessary.
+
+8. Logical Module Ordering
+Arrange existing modules in a logical sequence based on their current purpose and workflow.
+
+The UI should make the application's workflow easy to understand.
+
+For example:
+
+Setup
+↓
+Input
+↓
+Processing
+↓
+Review
+↓
+Results
+↓
+History
+
+However, do not change the actual underlying workflow or processing sequence.
+
+This is only about how the existing functionality is presented and navigated.
+
+9. Dedicated Screens Instead of Excessive Popups
+Avoid using large popups/modals for complete workflows.
+
+Where an existing operation already represents a substantial workflow, present it in a dedicated application screen/workspace instead of placing the entire workflow inside a modal.
+
+For example:
+
+Module
+   ↓
+Operation
+   ↓
+Dedicated Workspace
+
+Use modals only for lightweight interactions such as:
+
+Confirmation
+
+Warning
+
+Small forms
+
+Quick actions
+
+Short contextual information
+
+Do NOT change the actual operation itself.
+
+Only change how it is presented.
+
+10. One Screen = One Clear Purpose
+Each screen should have a clear purpose.
+
+Avoid putting unrelated operations together.
+
+A typical screen structure should be:
+
+Breadcrumb
+
+Page Title
+Short description
+
+Primary Action / Secondary Actions
+
+Main Content
+
+Supporting Information
+
+The user should immediately understand:
+
+Where they are
+
+What this page does
+
+What information they are seeing
+
+What the primary action is
+
+What they can do next
+
+11. Consistent Page Structure
+Use a consistent layout across all modules.
+
+Example:
+
+┌─────────────────────────────────────────────┐
+│ Breadcrumb                                  │
+│                                             │
+│ Page Title                         Actions  │
+│ Short description                           │
+├─────────────────────────────────────────────┤
+│                                             │
+│              Main Content                   │
+│                                             │
+└─────────────────────────────────────────────┘
+
+Do not create completely different UI patterns for different parts of the application unless the functionality genuinely requires it.
+
+12. Reduce Visual Clutter
+The current UI should be reviewed for unnecessary visual elements.
+
+Avoid excessive:
+
+Cards
+
+Borders
+
+Shadows
+
+Gradients
+
+Decorative icons
+
+Large headings
+
+Empty spacing
+
+Repeated descriptions
+
+Status indicators
+
+Progress indicators
+
+The goal is a clean, modern, professional interface.
+
+Use visual elements only when they improve usability.
+
+13. Progress and Processing UI
+Do not show unnecessary progress information.
+
+Avoid meaningless messages such as:
+
+Processing...
+Progress...
+AI is working...
+Please wait...
+Generating...
+
+If actual measurable progress exists, present it clearly.
+
+Example:
+
+Processing 248 records
+
+████████████████░░░░  78%
+
+If actual progress cannot be meaningfully measured, use a simple loading state instead.
+
+Do not change the underlying processing behavior.
+
+Only change its visual presentation.
+
+14. Loading States
+Use appropriate loading states such as:
+
+Skeleton loading
+
+Subtle spinner
+
+Inline loading indicator
+
+Button loading state
+
+Do not block the entire interface unnecessarily.
+
+Never expose technical implementation details during loading.
+
+15. Error Presentation
+Do not expose raw technical errors to normal users.
+
+Avoid showing things like:
+
+TypeError...
+undefined...
+API error...
+Stack trace...
+Internal exception...
+
+Instead, present a clean user-facing message while preserving the existing error behavior.
+
+Example:
+
+Something went wrong.
+
+We couldn't complete this operation.
+
+[Try Again]
+
+If the existing application already provides technical details, keep them available where appropriate, but visually separate them from the primary user-facing message.
+
+16. Success Feedback
+Use subtle feedback for successful actions.
+
+For example:
+
+✓ Changes saved
+
+Use a dedicated success screen only when the existing workflow genuinely requires one.
+
+Do not add new functional behavior.
+
+17. Forms
+Improve existing forms without changing their fields, validation rules, or data behavior.
+
+You may:
+
+Group related fields
+
+Improve spacing
+
+Improve labels
+
+Improve field hierarchy
+
+Use sections
+
+Collapse advanced options
+
+Improve helper text
+
+Improve error presentation
+
+Improve button placement
+
+Do NOT:
+
+Add new required fields
+
+Remove existing required fields
+
+Change validation rules
+
+Change submitted data
+
+Change field meaning
+
+Change backend behavior
+
+18. Buttons
+Create a clear visual hierarchy.
+
+Use:
+
+Primary actions
+Create
+Save
+Continue
+Run
+Submit
+
+Secondary actions
+Back
+Cancel
+Edit
+Filter
+
+Destructive actions
+Delete
+Remove
+Reset
+
+Use concise labels.
+
+Avoid unnecessarily long button text.
+
+19. Tables and Data Views
+Improve readability of existing tables.
+
+Use:
+
+Clear column hierarchy
+
+Appropriate spacing
+
+Consistent alignment
+
+Status indicators
+
+Search where an existing search function already exists
+
+Filtering controls where existing functionality supports filtering
+
+Pagination where existing functionality supports pagination
+
+Do not invent new data operations.
+
+20. Empty States
+Improve existing empty states.
+
+Instead of:
+
+No data found.
+
+Prefer:
+
+No processing history
+
+Completed processes will appear here.
+
+If an existing relevant action exists, make it visually accessible:
+
+[Start New Process]
+
+Do not create a new action that does not already exist.
+
+21. Breadcrumbs
+Use breadcrumbs for deeper navigation.
+
+Example:
+
+Operations / Module 02 / Processing / Review
+
+This should help users understand their current location without changing the actual navigation logic.
+
+22. Responsive Design
+The redesigned UI should work properly across:
+
+Desktop
+
+Laptop
+
+Tablet
+
+Smaller screens
+
+Maintain the same functionality across screen sizes.
+
+Responsive changes must be presentation-only.
+
+23. Design System
+Use one consistent design system throughout the application.
+
+Maintain consistency in:
+
+Typography
+
+Colors
+
+Spacing
+
+Border radius
+
+Shadows
+
+Icons
+
+Buttons
+
+Inputs
+
+Tables
+
+Cards
+
+Tabs
+
+Navigation
+
+Notifications
+
+Do not randomly change component styles from one module to another.
+
+24. Professional Visual Style
+The final UI should feel:
+
+Modern
+
+Clean
+
+Minimal
+
+Professional
+
+Consistent
+
+Intuitive
+
+Fast
+
+Uncluttered
+
+Production-ready
+
+Avoid making it overly decorative.
+
+The design should prioritize clarity and usability over visual effects.
+
+25. Do Not Make the Application Look AI-Generated
+This is an important requirement.
+
+The final UI should not contain obvious patterns associated with generic AI-generated interfaces.
+
+Avoid:
+
+Excessive rounded cards
+
+Excessive gradients
+
+Random colorful icons
+
+Excessive glassmorphism
+
+Unnecessary animations
+
+Excessive badges
+
+Generic AI terminology
+
+Verbose explanatory text
+
+Repetitive cards
+
+Decorative UI without functional purpose
+
+The result should look like a carefully designed professional software product.
+
+26. Preserve Existing Routes and Functionality
+Unless absolutely necessary for a purely visual navigation implementation, do not change existing routes, endpoints, actions, or functional behavior.
+
+If navigation needs to be visually reorganized, preserve the existing destinations and functionality behind the new UI.
+
+27. Do Not Rewrite Working Logic
+If you encounter existing code that works correctly but looks difficult or poorly structured, do not rewrite it merely for code quality.
+
+The scope is UI/UX.
+
+Do not refactor backend or business logic unless a change is strictly required to render the redesigned UI, and even then, preserve the exact existing behavior and data flow.
+
+28. Before Changing Anything
+First inspect the existing application carefully.
+
+Identify:
+
+Existing pages
+
+Existing modules
+
+Existing operations
+
+Existing navigation
+
+Existing components
+
+Existing workflows
+
+Existing forms
+
+Existing states
+
+Existing API/data interactions
+
+Existing user flows
+
+Then create a UI/UX structure based on the existing functionality.
+
+Do not assume functionality that does not exist.
+
+29. Final Validation
+After completing the redesign, verify that:
+
+Every existing feature still works.
+
+Every existing operation is still accessible.
+
+No data flow has changed.
+
+No API behavior has changed.
+
+No business logic has changed.
+
+No validation behavior has changed.
+
+No existing functionality has been removed.
+
+No new business functionality has been introduced.
+
+All UI text is English.
+
+Navigation is clear.
+
+Main menus are collapsible.
+
+Existing modules are logically organized.
+
+Major operations have appropriate dedicated screens.
+
+Popups are used only where appropriate.
+
+The interface is responsive.
+
+The design is consistent.
+
+The UI contains no unnecessary wording.
+
+The application does not visually communicate that it was generated by AI.
+
+ABSOLUTE CONSTRAINT
+Before implementing any change, ask yourself:
+
+"Does this change modify functionality, business logic, data flow, API behavior, or feature behavior?"
+
+If the answer is YES, do not make the change.
+
+If the answer is NO, and the change improves UI/UX, it is within scope.
+
+Final Objective
+Transform the existing application into a:
+
+Clean + Modern + Professional + Intuitive + User-Friendly + Consistent UI
+
+while keeping:
+
+100% of the existing functionality, business logic, data flow, and feature behavior unchanged.
+
+The application should behave exactly as it does today.
+
+Only the way users see, navigate, and interact with the existing functionality should be improved.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-28T02:17:23+06:00.
+</ADDITIONAL_METADATA>
